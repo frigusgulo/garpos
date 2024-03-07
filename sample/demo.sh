@@ -15,7 +15,7 @@ mc="1" # max core
 ### or set "" to use [#!/usr/bin/env python]
 #python_exe="python"
 #python_exe="python3"
-python_exe=""
+python_exe="/Users/franklyndunbar/anaconda3/envs/seafloor-geodesy/bin/python3"
 
 slvsingle="${python_exe} ${bindir}/solveSingleEpoch.py"
 

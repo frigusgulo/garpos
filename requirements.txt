@@ -1,0 +1,7 @@
+numpy
+scikit-learn
+scikit-sparse
+matplotlib
+scipy 
+pandas
+matplotlib

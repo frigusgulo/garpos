@@ -1,0 +1,4 @@
+** Fdunbar - March 12 2024
+
+re-write the garpos_main -> MPEstimate path to be used around schema definitions
+(i.e. model hyper-parameters, observation data, site data, and svp data)

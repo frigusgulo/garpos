@@ -138,16 +138,30 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
 	mode = "Inversion-type %1d" % invtyp
 	mppos, Dipos, slvidx0, mtidx = init_position(cfg, denu, MTs)
 
+	# MPPOS - model parameter position
+	# Dipos - a priori covariance for model parameters
+	# slvidx0 - indices of model parameters to be solved
+	# mtidx - indices of mp for each transponder 
+
 	# in case where positions should not be solved
 	if invtyp == 1:
 		Dipos = lil_matrix( (0, 0) )
 		slvidx0 = np.array([])
 
 	nmppos = len(slvidx0)
+
+	# nmppos - number of position model parameters to be solved
+
 	cnt = np.array([ mppos[imt*3:imt*3+3] for imt in range(nMT)])
+
+	# cnt - array of transponder positions
 	cnt = np.mean(cnt, axis=0)
+
+	# cnt - mean position of transponders (i.e. station center?)
+
 	# MT index for model parameter
 	shots['mtid'] = [ mtidx[mt] for mt in shots['MT'] ]
+
 
 	### Set Model Parameters for gamma ###
 	knotintervals = [knotint0, knotint1, knotint1, knotint2, knotint2]
@@ -157,8 +171,12 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
 	knots = make_knots(shots, spdeg, knotintervals)
 	ncps = [ max([0, len(kn)-spdeg-1]) for kn in knots]
 
+	# NCPS [LIST] - number of control points for each component of gamma
+
 	# set pointers for model parameter vector
 	imp0 = np.cumsum(np.array([len(mppos)] + ncps))
+
+	# IMP0 - indices of model parameters for each component of gamma
 
 	# set full model parameter vector
 	mp = np.zeros(imp0[-1])

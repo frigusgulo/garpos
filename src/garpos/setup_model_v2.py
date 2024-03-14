@@ -6,12 +6,12 @@ from sksparse.cholmod import cholesky
 import pandas as pd
 
 from ..schemas.obs_data import Site, PositionENU, ATDOffset, Transponder, ShotData
-from ..schemas.hyp_params import HyperParams, InversionParams
-
+from ..schemas.hyp_params import HyperParams, InversionParams,InversionType
+from ..schemas.module_io import GaussianModelParameters,Normal
 
 def init_position(
-    site_data: Site, hyper_params: HyperParams
-) -> Tuple[List[float], np.ndarray, List[int], Dict[str, int]]:
+    site_data: Site, inversion_params: InversionParams
+) -> GaussianModelParameters:
     """
     Calculate Jacobian matrix for positions.
 
@@ -27,55 +27,37 @@ def init_position(
             - transponder_covmat_positions (Dict[str, int]): A dictionary mapping transponder IDs to their covariance matrix positions.
     """
 
+    model_params = GaussianModelParameters()
+
+    # Get Antenna-Transducer-Offset (ATD) data
     atd_offset: ATDOffset = site_data.atd_offset
     atd_offset_cov: np.ndarray = atd_offset.get_covariance()
     atd_offset_position: List[float] = atd_offset.get_offset()
-
-    transponders: List[Transponder] = site_data.transponders
-    site_position_delta: np.ndarray = site_data.delta_center_position.get_position()
-    if hyper_params.inversiontype.gammas:
-        site_position_delta += np.asarray(hyper_params.positionalOffset)
-
-    site_position_cov: np.ndarray = site_data.center_enu.get_covariance()
-
-    # 1. Create 1d array for station positions, and seperate array for station position uncertainty
-
-    # compute a prirori covariance for site data
-    # transponder position covariance: T_n
-    # site center position covariance: C
-    # antenna transducer offset covariance: ATD
-    # cov_pos_init = [T_1, T_2, ... T_n-1, C, ATD]
-    mean_positions: List[float] = []
-    transponder_covmat_positions: dict[str, int] = {}
-    transponder_position_covs: List[np.ndarray] = []
-
-    for idx, t in enumerate(transponders):
-        transponder_covmat_positions[t.id] = idx * 3
-        transponder_position_covs.append(t.position_enu.get_covariance())
-        mean_positions.extend(t.position_enu.get_position().tolist())
-
-    mean_positions.extend(site_position_delta.tolist())
-    mean_positions.extend(atd_offset_position)
-    # if position_uncertainty.sum() > 0.002:
-    #     # Dont know what this is actually checking, from line 70 of setup_model.py
-    #     raise ValueError("Error: ape for each station must be 0 in rigid-array mode!")
-
-    # Perform funcs from lines 77-88. Thresholds the diagonal of the atd_offset_cov matrix
+    ## Perform funcs from lines 77-88. Thresholds the diagonal of the atd_offset_cov matrix
     for i in range(atd_offset_cov.shape[0]):
         if atd_offset_cov[i, i] > 1.0e-8:
             atd_offset_cov[i, i] = 3.0
 
-    cov_pos_init: np.ndarray = block_diag(
-        (transponder_position_covs, site_position_cov, atd_offset_cov)
-    ).toarray()
+    model_params.atd_offset_position = Normal(
+        atd_offset_position, atd_offset_cov
+    )
 
-    # Get the indices of the model parameters to be solved by checking the diagonal of the covariance matrix
-    solve_idx = np.where(np.diag(cov_pos_init) > 1.0e-14)[0].tolist()
+    # Get transponder data
+    transponders: List[Transponder] = site_data.transponders
+    for t in transponders:
+        mean = t.position_enu.get_position()
+        cov = t.position_enu.get_covariance()
+        model_params.transponder_positions[t.id] = Normal(mean, cov)
 
-    cov_pos_inv = np.linalg.inv(cov_pos_init)
+    # Get site position delta data
+    site_position_delta_mean: np.ndarray = site_data.delta_center_position.get_position()
+    if inversion_params.inversiontype == InversionType.gammas:
+        site_position_delta_mean += np.asarray(inversion_params.positionalOffset)
 
-    return mean_positions, cov_pos_inv, solve_idx, transponder_covmat_positions
+    site_position_delta_cov: np.ndarray = site_data.center_enu.get_covariance()
+    model_params.site_position_delta = Normal(site_position_delta_mean, site_position_delta_cov)
 
+    return model_params
 
 def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndarray]:
     """
@@ -165,27 +147,26 @@ def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndar
 
 
 def derivative2(
-    imp0: np.ndarray, knots: List[np.ndarray], inv_params: InversionParams
-) -> np.ndarray:
+    model_param_pointer:np.ndarray, knots: List[np.ndarray], inv_params: InversionParams
+) -> lil_matrix:
     # Calculate the matrix for 2nd derivative of the B-spline basis
-    assert imp0.shape[-1] == 6
-
+    
     lambda_grad = inv_params.log_gradlambda * 10
     lambda_0 = inv_params.log_lambda[0] * 10
     lambdas = [lambda_0] + [lambda_0 * lambda_grad] * 4
 
     p = inv_params.spline_degree
-    diff = lil_matrix((imp0[5], imp0[5]))
+    diff = lil_matrix((model_param_pointer[5], model_param_pointer[5]))
 
     for k in range(len(lambdas)):
         kn = knots[k]
         if len(kn) == 0:
             continue
 
-        delta = lil_matrix((imp0[k + 1] - imp0[k] - 2, imp0[k + 1] - imp0[k]))
-        w = lil_matrix((imp0[k + 1] - imp0[k] - 2, imp0[k + 1] - imp0[k] - 2))
+        delta = lil_matrix((model_param_pointer[k + 1] - model_param_pointer[k] - 2, model_param_pointer[k + 1] - model_param_pointer[k]))
+        w = lil_matrix((model_param_pointer[k + 1] - model_param_pointer[k] - 2, model_param_pointer[k + 1] - model_param_pointer[k] - 2))
 
-        for j in range(imp0[k + 1] - imp0[k] - 2):
+        for j in range(model_param_pointer[k + 1] - model_param_pointer[k] - 2):
             dkn0 = (kn[j + p + 1] - kn[j + p]) / 3600.0
             dkn1 = (kn[j + p + 2] - kn[j + p + 1]) / 3600.0
 
@@ -201,9 +182,9 @@ def derivative2(
         w = w.tocsr()
 
         dk = (delta.T @ w) @ delta
-        diff[imp0[k] : imp0[k + 1], imp0[k] : imp0[k + 1]] = dk / lambdas[k]
+        diff[model_param_pointer[k] : model_param_pointer[k + 1], model_param_pointer[k] : model_param_pointer[k + 1]] = dk / lambdas[k]
 
-    H = diff[imp0[0] :, imp0[0] :]
+    H = diff[model_param_pointer[0] :, model_param_pointer[0] :]
 
     return H
 

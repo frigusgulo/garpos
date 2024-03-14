@@ -163,7 +163,7 @@ def make_knots(shotdat, spdeg, knotintervals):
 	return knots
 
 
-def derivative2(imp0, p, knots, lambdas):
+def derivative2(imp0,knots, lambdas):
 	"""
 	Calculate the matrix for 2nd derivative of the B-spline basis
 

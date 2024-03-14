@@ -94,8 +94,8 @@ def calc_traveltime(shotdat, mp, nMT, icfg, svp):
 	#######################################
 	ndat = len(shotdat.index)
 	nl = len(l_depth)
-	nn = ctypes.byref(ctypes.c_int32(ndat*2))
-	nl = ctypes.byref(ctypes.c_int32(nl))
+	nn = ctypes.byref(ctypes.c_int32(ndat*2)) # done
+	nl = ctypes.byref(ctypes.c_int32(nl)) # done
 	
 	# output
 	ctm = np.zeros_like(dst)

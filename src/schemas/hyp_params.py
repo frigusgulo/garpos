@@ -20,7 +20,11 @@ class InversionType(Enum):
 
 class InversionParams(BaseModel):
     spline_degree:int = Field(default=3)
-
+    log_lambda: List[float] = Field(default=[-2,-1],description="Smoothness paramter for backgroun perturbation")
+    log_gradlambda: float = Field(default=-1,description="Smoothness paramter for spatial gradient")
+    mu_t: List[float] = Field(default=[0.0,1.0],description="Correlation length of data for transmit time [minute]")
+    mu_mt: float = Field(default=0.5,description="Data correlation coefficient b/w the different transponders")
+  
     knotint0: int = Field(default=5,description="Typical Knot interval (in min.) for gamma's component (a0, a1, a2)")
     knotint1: int = Field(default=5,description="Typical Knot interval (in min.) for gamma's component (a0, a1, a2)")
     knotint2: int = Field(default=5,description="Typical Knot interval (in min.) for gamma's component (a0, a1, a2)")

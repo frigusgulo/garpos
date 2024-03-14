@@ -3,9 +3,9 @@ import numpy as np
 from typing import List,Tuple,Dict
 from scipy.sparse import csc_matrix, lil_matrix, linalg,block_diag
 from sksparse.cholmod import cholesky
+import pandas as pd
 
-
-from ..schemas.obs_data import Site,PositionENU,ATDOffset,Transponder
+from ..schemas.obs_data import Site,PositionENU,ATDOffset,Transponder,ShotData
 from ..schemas.hyp_params import HyperParams, InversionParams
 
 
@@ -74,3 +74,55 @@ def init_position(site_data: Site, hyper_params: HyperParams) -> Tuple[List[floa
     cov_pos_inv = np.linalg.inv(cov_pos_init)
 
     return mean_positions,cov_pos_inv,solve_idx,transponder_covmat_positions
+
+
+def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndarray]:
+    """
+    Create the B-spline knots for correction value "gamma".
+
+    Args:
+        shotdat (pd.DataFrame): GNSS-A shot dataset.
+        spdeg (int): Spline degree (=3).
+        knotintervals (List[int]): Approximate knot intervals.
+
+    Returns:
+        List[np.ndarray]: B-spline knots for each component in "gamma".
+    """
+
+    n_sets = len(shot_data.sets)
+    
+    trans_times_first = np.min([shot_obs.trans_time[0] for shot_data in list(shot_data.sets) for shot_obs in shot_data.values()])
+    trans_times_last = np.max([shot_obs.trans_time[-1] for shot_data in list(shot_data.sets) for shot_obs in shot_data.values()])
+
+    observation_duration = trans_times_last - trans_times_first
+
+    # knotintervals = [knotint0, knotint1, knotint1, knotint2, knotint2]
+    # Create the B-spline knots for correction value "gamma".
+    knot_intervals = [inv_params.knotint0,inv_params.knotint1,inv_params.knotint1,inv_params.knotint2,inv_params.knotint2]
+    n_knots = [ int(observation_duration / interval) for interval in knot_intervals]
+    knots = [np.linspace(trans_times_first,trans_times_last,knot+1) for knot in n_knots]
+
+    for k, _ in enumerate(knots):
+        if n_knots[k] == 0:
+            knots[k] = np.array([])
+        rm_knot = np.array([])
+
+        for i in range(n_sets-1):
+            isetkn = np.where( (knots[k] > trans_times_last) & (knots[k]<trans_times_first[i+1]) )[0]
+            if len(isetkn) > 2*(inv_params.spline_degree+2):
+                rmknot = np.append(rm_knot, isetkn[isetkn[inv_params.spline_degree+1:-inv_params.spline_degree-1]])
+
+        rm_knot = rm_knot.astype(int)
+        if len(rmknot) > 0:
+            knots[k] = np.delete(knots[k], rm_knot)
+        
+        dkn = (observation_duration) / float(n_knots[k])
+
+        add_kn_first = np.array([trans_times_first - dkn*(n+1) for n in reversed(range(inv_params.spline_degree))])
+        add_kn_last = np.array([trans_times_last + dkn*(n+1) for n in range(inv_params.spline_degree)])
+
+        knots[k] = np.append(add_kn_first,knots[k])
+        knots[k] = np.append(knots[k],add_kn_last)
+
+    
+    return knots

@@ -3,16 +3,17 @@ Author: Franklyn Dunbar
 Date: 2024-03-12
 Email: franklyn.dunbar@earthscope.org
 """
-from typing import List,Optional
+from typing import List,Optional,Dict
 from pydantic import BaseModel,Field,model_validator,ValidationError
 import numpy as np
+from datetime import datetime
 import pandera as pa
 from pandera.typing import Series,Index,DataFrame
 
 
 class Point(BaseModel):
     value: float
-    sigma: float
+    sigma: Optional[float] = 0.0
 
 class PositionENU(BaseModel):
     east: Point
@@ -61,10 +62,12 @@ class Transponder(BaseModel):
 
 class Site(BaseModel):
     name: str
+    campaign: Optional[str] = None
     transponders: List[Transponder]
     delta_center_position: PositionENU
     atd_offset: ATDOffset
     center_enu: PositionENU
+    center_llh: PositionLLH
 
 
 class AntennaPosition(BaseModel):
@@ -75,15 +78,21 @@ class AntennaPosition(BaseModel):
     pitch: float
     roll: float
 
-class ShotObservation(BaseModel):
-    set: str # Names of subset in each observation (typically S01, S02,...) |
-    line: str #Names of survey lines in each observation (typically L01, L02,...)
-    station: Transponder.id # Names of stations in each observation (typically M01, M02,...)
-    travel_time: float # Observed travel time between transmission and reception of the signal [s]
-    transmission_time: float # Time of transmission of the signal in MJD [s]
-    reception_time: float # Time of reception of the signal in MJD [s]
-    antenna0: AntennaPosition
-    antenna1: AntennaPosition
+class ShotObservations(BaseModel):
+    line_number: int
+    travel_time: List[float] # Observed travel time between transmission and reception of the signal [s]
+    trans_time: List[float] # Time of transmission of the signal in MJD [s]
+    recep_time: List[float] # Time of reception of the signal in MJD [s]
+    antenna_trn: List[AntennaPosition] # Antenna position at the time of transmission
+    antenna_rcv: List[AntennaPosition] # Antenna position at the time of reception
+
+class ShotData(BaseModel):
+    number: int 
+    date_utc: datetime
+    date_mjd: float
+    ref_frame: str = "ITRF2014"
+    transponders: List[Transponder]
+    sets: List[Dict[Transponder.id,ShotObservations]]
 
 
 
@@ -108,27 +117,24 @@ class ObservationData(pa.DataFrameModel):
     3,S01,L01,M14,2.68107,0.0,0.0,0.0,False,30102.396135,-23.25514,1387.38992,14.75355,192.39,0.1,-1.79,30106.13871,-23.96613,1378.4627,14.58135,192.92,0.21,-1.7
     4,S01,L01,M11,2.218846,0.0,0.0,0.0,False,30103.4862,-23.57701,1384.73242,14.65861,192.62,-0.14,-1.5,30106.766555,-24.0478,1377.09283,14.68464,193.04,0.59,-1.81
     """
-    SET: Series[str] = pa.Field(
-        description="Set name"
+    set : Series[str] = pa.Field(
+        description="Set name",alias="SET"
     )
-    LN: Series[str] = pa.Field(
-        description="Line name"
+    line : Series[str] = pa.Field(
+        description="Line name",alias="LN"
     )
-    MT: Series[Transponder.id] = pa.Field(
-        description="Station name"
+    transponder_id : Series[Transponder.id] = pa.Field(
+        description="Station name",alias="MT"
     )
-    TT: Series[float] = pa.Field(
-        description="Travel time [sec]"
+    travel_time: Series[float] = pa.Field(
+        description="Travel time [sec]",alias="TT"
     )
-    ResiTT: Series[float] = pa.Field()
 
-    TakeOff: Series[float] = pa.Field()
 
-    gamma: Series[float] = pa.Field()
+    transmission_time: Series[float] = pa.Field(description="Time of transmission of the acoustic signal in MJD [s]",alias="ST")
 
-    flag: Series[bool] = pa.Field()
+    reception_time: Series[float] = pa.Field(description="Time of reception of the acoustic signal in MJD [s]",alias="RT")
 
-    ST: Series[float] = pa.Field()
 
     ant_e0: Series[float] = pa.Field(
         description="Antenna position in east direction (ENU coords) at the time of the first measurement [m]")
@@ -143,7 +149,6 @@ class ObservationData(pa.DataFrameModel):
 
     roll0: Series[float] = pa.Field(description="Antenna roll at the time of the first measurement [deg]")
 
-    RT: Series[float] = pa.Field()
 
     ant_e1: Series[float] = pa.Field(description="Antenna position in east direction (ENU coords) at the time of the second measurement [m]")
 
@@ -157,6 +162,17 @@ class ObservationData(pa.DataFrameModel):
 
     roll1: Series[float] = pa.Field(description="Antenna roll at the time of the second measurement [deg]")
 
+
+
+class ModelResults(ObservationData):
+    # These fields are populated after the model run
+    ResiTT: Optional[Series[float]] = pa.Field()
+
+    TakeOff: Optional[Series[float]] = pa.Field()
+
+    gamma: Optional[Series[float]] = pa.Field()
+
+    flag: Optional[Series[bool]] = pa.Field()
 
 
 # TODO define the schema for a single line of the observation data file

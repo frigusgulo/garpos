@@ -2,3 +2,6 @@
 
 re-write the garpos_main -> MPEstimate path to be used around schema definitions
 (i.e. model hyper-parameters, observation data, site data, and svp data)
+
+    1. Refactor functions in setup_model.py to interface with schemas
+    2. Refactor functions in forward.py to interface with schemas

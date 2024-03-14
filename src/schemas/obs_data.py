@@ -3,8 +3,9 @@ Author: Franklyn Dunbar
 Date: 2024-03-12
 Email: franklyn.dunbar@earthscope.org
 """
-from typing import List
+from typing import List,Optional
 from pydantic import BaseModel,Field,model_validator,ValidationError
+import numpy as np
 import pandera as pa
 from pandera.typing import Series,Index,DataFrame
 
@@ -17,9 +18,19 @@ class PositionENU(BaseModel):
     east: Point
     north: Point
     up: Point
-    cov_nu: float
-    cov_ue: float
-    cov_en: float
+    cov_nu: Optional[float] = 0.0
+    cov_ue: Optional[float] = 0.0
+    cov_en: Optional[float] = 0.0
+
+    def get_position(self) -> List[float]:
+        return [self.east.value,self.north.value,self.up.value]
+    
+    def get_covariance(self) -> np.ndarray:
+        cov_mat = np.diag([self.east.sigma**2,self.north.sigma**2,self.up.sigma**2])
+        cov_mat[0,1] = cov_mat[1,0] = self.cov_en**2
+        cov_mat[0,2] = cov_mat[2,0] = self.cov_ue**2
+        cov_mat[1,2] = cov_mat[2,1] = self.cov_nu**2
+        return cov_mat
 
 class PositionLLH(BaseModel):
     latitude: Point
@@ -30,10 +41,20 @@ class ATDOffset(BaseModel):
     forward: Point
     rightward: Point
     downward: Point
-    cov_rd: float
-    cov_df: float
-    cov_fr: float
+    cov_rd: Optional[float] = 0.0
+    cov_df: Optional[float] = 0.0
+    cov_fr: Optional[float] = 0.0
 
+    def get_offset(self) -> List[float]:
+        return [self.forward.value,self.rightward.value,self.downward.value]
+    
+    def get_covariance(self) -> np.ndarray:
+        cov_mat = np.diag([self.forward.sigma**2,self.rightward.sigma**2,self.downward.sigma**2])
+        cov_mat[0,1] = cov_mat[1,0] = self.cov_fr**2
+        cov_mat[0,2] = cov_mat[2,0] = self.cov_df**2
+        cov_mat[1,2] = cov_mat[2,1] = self.cov_rd**2
+        return cov_mat
+    
 class Transponder(BaseModel):
     id: str
     position_enu: PositionENU
@@ -93,7 +114,7 @@ class ObservationData(pa.DataFrameModel):
     LN: Series[str] = pa.Field(
         description="Line name"
     )
-    MT: Series[Station.name] = pa.Field(
+    MT: Series[Transponder.id] = pa.Field(
         description="Station name"
     )
     TT: Series[float] = pa.Field(

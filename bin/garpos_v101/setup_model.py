@@ -6,6 +6,7 @@ Modified:
 		to use cholesky decomposition for calc. inverse
 Contains:
 	init_position
+	
 	make_knots
 	derivative2
 	data_correlation
@@ -48,11 +49,14 @@ def init_position(cfg, denu, MTs):
 		mtidx[mt] = imt * 3
 		dpos = cfg.get("Model-parameter", mt + "_dPos").split()
 		dpos = list(map(float, dpos))
+		# creating 2d array for station position
 		mp = np.append(mp, dpos[0:3])
+		# creating 2d array for station psotion uncertainty
 		ae = np.append(ae, dpos[3:6])
 
 	dcnt = cfg.get("Model-parameter", "dCentPos").split()
 	dcnt = list(map(float, dcnt))
+	# what is denu?
 	mp = np.append(mp, dcnt[0:3]+denu[0:3])
 	ae = np.append(ae, dcnt[3:6])
 	if len(dcnt) <= 6:

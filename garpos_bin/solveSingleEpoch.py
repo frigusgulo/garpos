@@ -44,6 +44,7 @@ if __name__ == '__main__':
 
 	odir = options.directory+"/"
 	mc = options.maxcore
+
 	rf = drive_garpos(options.cfgfile, options.invcfg, odir, options.suf, mc)
 
 	exit()

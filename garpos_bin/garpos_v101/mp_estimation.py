@@ -16,8 +16,9 @@ import math
 import configparser
 import numpy as np
 from scipy.sparse import csr_matrix, csc_matrix, lil_matrix, linalg, identity
-from sksparse.cholmod import cholesky
+#from sksparse.cholmod import cholesky
 import pandas as pd
+import pdb
 
 # garpos module
 from .setup_model import init_position, make_knots, derivative2, data_correlation
@@ -243,6 +244,8 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
 	# Calc initial ResiTT
 	if invtyp != 0:
 		shots["gamma"] = 0.
+
+	pdb.set_trace()
 	shots = calc_forward(shots, mp, nMT, icfg, svp, T0)
 
 	# Set data covariance

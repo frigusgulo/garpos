@@ -102,7 +102,7 @@ class SoundVelocityProfile(pa.DataFrameModel):
         ge=0, le=10000, description="Depth of the speed [m]"
     )
     speed: Series[float] = pa.Field(
-        ge=0, le=5000, description="Spee of sound [m/s]"
+        ge=0, le=3800, description="Spee of sound [m/s]"
     )
 
 class ObservationData(pa.DataFrameModel):

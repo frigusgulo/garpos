@@ -17,6 +17,9 @@ import numpy as np
 import pandas as pd
 from pandas.plotting import scatter_matrix
 import matplotlib.pyplot as plt
+import sys
+
+import pdb
 
 # garpos module
 from .mp_estimation import MPestimate
@@ -61,9 +64,11 @@ def parallelrun(inplist, maxcore):
 	
 	inp = list(zip(i0,i1,o1,o2,h0,h1,h2,h3,p0))
 	
-	with Pool(processes=mc) as p:
-		reslist = p.starmap(MPestimate, inp)
-		p.close()
+
+	reslist = MPestimate(*inp[0])
+	# with Pool(processes=mc) as p:
+	# 	reslist = p.starmap(MPestimate, inp)
+	# 	p.close()
 	
 	inplist["resfile"] = [ r[0] for r in reslist ]
 	inplist["RMS_dTT"] = [ r[1]/1000. for r in reslist ]
@@ -97,7 +102,7 @@ def drive_garpos(cfgf, icfgf, outdir, suf, maxcore):
 	resf : string
 		Result site-paramter file name (min-ABIC model).
 	"""
-	
+	print("\n\n\n\n DRIVE GARPOS \n\n\n\n")
 	# Set Hyperparamters for search
 	icfg = configparser.ConfigParser()
 	icfg.read(icfgf, 'UTF-8')
@@ -137,8 +142,11 @@ def drive_garpos(cfgf, icfgf, outdir, suf, maxcore):
 	filebase = site + "." + camp + suf
 	
 	# Set Input parameter list for ParallelRun
+
+	# Create hyperparameter list of all combinations
 	hps = np.array(list(itertools.product(lamb0s, glambs, mu_ts, mu_ms)))
 	
+	# Create output file name list for each hyperparameter list
 	sufs = [ suf ] * nmodels
 	for i, hp in enumerate(hps):
 		if nl > 1:
@@ -152,6 +160,7 @@ def drive_garpos(cfgf, icfgf, outdir, suf, maxcore):
 	
 	inputs = pd.DataFrame(sufs, columns = ['suffix'])
 	
+	# Add hyperparmaters to the inputs dataframe
 	inputs['lamb0'] = 10.**hps[:,0]
 	inputs['lgrad'] = 10.**hps[:,1]
 	inputs['mu_t'] = hps[:,2]*60.

@@ -54,7 +54,7 @@ def calc_traveltime(
     if min(yd) < -l_depth[-1]:
         print(min(yd) , -l_depth[-1])
         print("yd is deeper than layer")
-        print(mp[0:15] , mp[nMT*3+2])
+        print(model_params[0:15] , model_params[nMT*3+2])
         sys.exit(1)
     if max(ys) > -l_depth[0]:
         l_depth = np.append(-40.,l_depth)

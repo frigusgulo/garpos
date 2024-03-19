@@ -23,7 +23,7 @@ def MPestimate(
 
     positional_model_params: GaussianModelParameters = init_position(site_data, inversion_params)
 
-    knots : List[np.ndarray] = make_knots(shot_data, inversion_params)
+    knots : List[np.ndarray] = make_knots(site_data, inversion_params)
 
     num_ctrl_points: List[int] = [max([0,len(kn)-inversion_params.spline_degree-1]) for kn in knots]
 

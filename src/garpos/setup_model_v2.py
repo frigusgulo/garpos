@@ -86,9 +86,9 @@ def make_knots(shot_data: DataFrame[ObservationData], inv_params: InversionParam
 
     sets: List[str] = shot_data['set'].unique()
 
-    transmission_times = np.array([shot_data.loc[shot_data.set==s, "transmission_time"].min() for s in sets]).min()
+    transmission_times_first_set = np.array([shot_data.loc[shot_data.set==s, "transmission_time"].min() for s in sets]).min()
 
-    reception_times = np.array([shot_data.loc[shot_data.set==s, "reception_time"].max() for s in sets]).max()
+    reception_times_last_set = np.array([shot_data.loc[shot_data.set==s, "reception_time"].max() for s in sets]).max()
     
 
     transmission_times_first: float = shot_data.transmission_time.values.min()
@@ -119,7 +119,7 @@ def make_knots(shot_data: DataFrame[ObservationData], inv_params: InversionParam
 
         for i in range(len(sets) - 1):
             isetkn = np.where(
-                (knots[k] > transmission_times_first) & (knots[k] < transmission_times_first[i + 1])
+                (knots[k] > reception_times_last_set) & (knots[k] < transmission_times_first_set[i + 1])
             )[0]
             if len(isetkn) > 2 * (inv_params.spline_degree + 2):
                 rmknot = np.append(

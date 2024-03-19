@@ -40,8 +40,8 @@ class Raytracer:
         yd,
         ys,
         dsv,
-        ctm,
-        cag,
+    
+      
     ) -> Tuple[np.ndarray, np.ndarray]:
 
         n_l = len(l_depth)

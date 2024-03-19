@@ -5,9 +5,10 @@ from scipy.sparse import csc_matrix, lil_matrix, linalg, block_diag
 from sksparse.cholmod import cholesky
 import pandas as pd
 
-from ..schemas.obs_data import Site, PositionENU, ATDOffset, Transponder, ShotData
-from ..schemas.hyp_params import HyperParams, InversionParams,InversionType
+from ..schemas.obs_data import Site,ATDOffset,Transponder,PositionENU
+from ..schemas.hyp_params import InversionParams,InversionType
 from ..schemas.module_io import GaussianModelParameters,Normal
+
 
 def init_position(
     site_data: Site, inversion_params: InversionParams
@@ -27,37 +28,49 @@ def init_position(
             - transponder_covmat_positions (Dict[str, int]): A dictionary mapping transponder IDs to their covariance matrix positions.
     """
 
-    model_params = GaussianModelParameters()
+    transponder_idx = {}
+    model_params_mean = np.array([])
+    model_params_var = []
+    for t_idx,transponder in enumerate(site_data.transponders):
+
+        transponder_idx[transponder.id] = t_idx * 3
+        transponder_position_mean: List[float] = transponder.position_enu.get_position()
+        transponder_position_cov: np.ndarray = transponder.position_enu.get_covariance()
+
+        # creating 2d array for station position
+        model_params_mean = np.append(model_params_mean, transponder_position_mean)
+        # creating 2d array for station psotion uncertainty
+        model_params_var.append(transponder_position_cov)
+
+    # Get site position delta data
+    site_position_delta: PositionENU = site_data.delta_center_position
+    site_position_delta_mean: List[float] = site_position_delta.get_position()
+    site_position_delta_cov: np.ndarray = site_position_delta.get_covariance()
+
+    model_params_mean = np.append(model_params_mean, site_position_delta_mean)
+    model_params_var.append(site_position_delta_cov)
 
     # Get Antenna-Transducer-Offset (ATD) data
     atd_offset: ATDOffset = site_data.atd_offset
+    atd_offset_position_mean: List[float] = atd_offset.get_offset()
     atd_offset_cov: np.ndarray = atd_offset.get_covariance()
-    atd_offset_position: List[float] = atd_offset.get_offset()
+
     ## Perform funcs from lines 77-88. Thresholds the diagonal of the atd_offset_cov matrix
     for i in range(atd_offset_cov.shape[0]):
         if atd_offset_cov[i, i] > 1.0e-8:
             atd_offset_cov[i, i] = 3.0
 
-    model_params.atd_offset_position = Normal(
-        atd_offset_position, atd_offset_cov
-    )
+    model_params_mean = np.append(model_params_mean, atd_offset_position_mean)
+    model_params_var.append(atd_offset_cov)
 
-    # Get transponder data
-    transponders: List[Transponder] = site_data.transponders
-    for t in transponders:
-        mean = t.position_enu.get_position()
-        cov = t.position_enu.get_covariance()
-        model_params.transponder_positions[t.id] = Normal(mean, cov)
+    # Set priori covariance matrix for model parameters
+    priori_cov:np.ndarray = block_diag(model_params_var).toarray()
 
-    # Get site position delta data
-    site_position_delta_mean: np.ndarray = site_data.delta_center_position.get_position()
-    if inversion_params.inversiontype == InversionType.gammas:
-        site_position_delta_mean += np.asarray(inversion_params.positionalOffset)
+    slvidx0 = np.where(np.diag(priori_cov) > 1.0e-14)[0]
 
-    site_position_delta_cov: np.ndarray = site_data.center_enu.get_covariance()
-    model_params.site_position_delta = Normal(site_position_delta_mean, site_position_delta_cov)
+    priori_cov_inv = np.linalg.inv(priori_cov)
+    return model_params_mean, priori_cov_inv, slvidx0, transponder_idx
 
-    return model_params
 
 def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndarray]:
     """

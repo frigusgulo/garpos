@@ -44,14 +44,14 @@ class GaussianModelParameters:
         num_params = len(self.transponder_positions.keys())*3 
 
         # Add the number of site position delta parameters
-        num_params += 2*3
+        # num_params += 2*3
         return num_params
     
     def get_mean(self):
         """
         Get the model parameter vector.
 
-        [TP,SPD,ATD]
+        [TP_0,TP_1,...]
         [transponser_positions,site_position_delta,atd_offset_position]
         Returns:
             np.ndarray: The model parameter vector.
@@ -59,8 +59,8 @@ class GaussianModelParameters:
         model_parameters = np.array([])
         for transponder in self.transponder_positions.values():
             model_parameters = np.append(model_parameters,transponder.mean)
-        model_parameters = np.append(model_parameters,self.site_position_delta.mean)
-        model_parameters = np.append(model_parameters,self.atd_offset_position.mean)
+        # model_parameters = np.append(model_parameters,self.site_position_delta.mean)
+        # model_parameters = np.append(model_parameters,self.atd_offset_position.mean)
         return model_parameters
     
     def get_cov_inv(self):
@@ -74,7 +74,12 @@ class GaussianModelParameters:
         cov_inv = np.zeros((self.num_params,self.num_params))
         for i,transponder in enumerate(self.transponder_positions.values()):
             cov_inv[i*3:i*3+3,i*3:i*3+3] = transponder.cov_inv
-        cov_inv[-6:-3,-6:-3] = self.site_position_delta.cov_inv
-        cov_inv[-3:,-3:] = self.atd_offset_position.cov_inv
+        # cov_inv[-6:-3,-6:-3] = self.site_position_delta.cov_inv
+        # cov_inv[-3:,-3:] = self.atd_offset_position.cov_inv
         return cov_inv
     
+
+    def get_transponder_center_mean(self):
+        # Get the mean position for the transponders
+        positions:np.ndarray = np.stack([t.mean for t in self.transponder_positions.values()],axis=0).mean(axis=0)
+        return positions

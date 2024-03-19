@@ -123,6 +123,7 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
     """
 	>> site
 	'SAGA'
+    
 	>> svp.columns
 	'/Users/franklyndunbar/Project/SeaFloorGeodesy/garpos/sample/obsdata/SAGA/SAGA.1903.kaiyo_k4-obs.csv'
 
@@ -297,11 +298,13 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
     H = derivative2(imp0, spdeg, knots, lambdas)
 
     ### set model parameter to be estimated ###
+    # slvidx is used to filter out ATD offset and Center Position
     mp0 = mp[slvidx]
     mp1 = mp0.copy()
     nmp = len(mp0)
 
     ### Set a priori covariance for model parameters ###
+    
     Di = lil_matrix( (nmp, nmp) )
     Di[:nmppos,:nmppos] = Dipos
     Di[nmppos:,nmppos:] = H
@@ -319,12 +322,12 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
     logdetDi = np.log(eigvDi).sum()
 
     # Initial parameters for gradient gamma
-    shots['sta0_e'] = mp[shots['mtid']+0] + mp[len(MTs)*3+0]
+    shots['sta0_e'] = mp[shots['mtid']+0] + mp[len(MTs)*3+0] # transponder position + station center position
     shots['sta0_n'] = mp[shots['mtid']+1] + mp[len(MTs)*3+1]
     shots['sta0_u'] = mp[shots['mtid']+2] + mp[len(MTs)*3+2]
-    shots['mtde'] = (shots['sta0_e'].values - cnt[0])
+    shots['mtde'] = (shots['sta0_e'].values - cnt[0]) # station center position - mean transponder position
     shots['mtdn'] = (shots['sta0_n'].values - cnt[1])
-    shots['de0'] = shots['ant_e0'].values - shots['ant_e0'].values.mean()
+    shots['de0'] = shots['ant_e0'].values - shots['ant_e0'].values.mean() # Normalized antennta positions
     shots['dn0'] = shots['ant_n0'].values - shots['ant_n0'].values.mean()
     shots['de1'] = shots['ant_e1'].values - shots['ant_e1'].values.mean()
     shots['dn1'] = shots['ant_n1'].values - shots['ant_n1'].values.mean()
@@ -354,7 +357,15 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
     if invtyp != 0:
         shots["gamma"] = 0.
 
-    pdb.set_trace()
+	# >>> shots
+   
+	#       index  SET   LN   MT        TT  ResiTT  TakeOff  gamma  ...       mtde      mtdn       de0          dn0        de1          dn1  iniflag     logTT
+	# 0         0  S01  L01  M11  2.289306     0.0      0.0    0.0  ...  -15.79525  426.6745   1.76721  1482.570718   2.981088  1471.462113    False  0.239196
+	# 1         1  S01  L01  M13  3.126690     0.0      0.0    0.0  ...    4.85175 -488.1135   7.53716  1422.313778   7.339668  1411.223463    False  0.550922
+	# 2         2  S01  L01  M14  2.702555     0.0      0.0    0.0  ... -506.90925   -4.7185   7.36635  1419.303338   7.306488  1409.409173    False  0.405145
+	# 3         3  S01  L01  M14  2.681070     0.0      0.0    0.0  ... -506.90925   -4.7185   6.36498  1396.816408   5.724938  1387.906783    False  0.397163
+	# 4         4  S01  L01  M11  2.218846     0.0      0.0    0.0  ...  -15.79525  426.6745   6.04311  1394.158908   5.643268  1386.536913    False  0.207934
+
     shots = calc_forward(shots, mp, nMT, icfg, svp, T0)
 
     # Set data covariance

@@ -151,6 +151,7 @@ def make_knots(shotdat, spdeg, knotintervals):
 			if len(isetkn) > 2*(spdeg+2):
 				rmknot = np.append(rmknot, isetkn[spdeg+1:-spdeg-1])
 		rmknot = rmknot.astype(int)
+
 		if len(rmknot) > 0:
 			knots[k] = np.delete(knots[k], rmknot)
 
@@ -163,7 +164,7 @@ def make_knots(shotdat, spdeg, knotintervals):
 	return knots
 
 
-def derivative2(imp0,knots, lambdas):
+def derivative2(imp0,p,knots, lambdas):
 	"""
 	Calculate the matrix for 2nd derivative of the B-spline basis
 

@@ -19,25 +19,20 @@ from .output import outresults
 
 def MPestimate(
         site_data:Site,
-        shot_data:ShotData,
-        sound_velocity_data: pd.DataFrame[SoundVelocityProfile],
         inversion_params:InversionParams):
 
     positional_model_params: GaussianModelParameters = init_position(site_data, inversion_params)
 
-    knots_ctrlpts: Tuple[List[np.ndarray], List[int]] = make_knots(shot_data, inversion_params)
+    knots : List[np.ndarray] = make_knots(shot_data, inversion_params)
 
-    knots, num_ctrl_points = knots_ctrlpts
+    num_ctrl_points: List[int] = [max([0,len(kn)-inversion_params.spline_degree-1]) for kn in knots]
 
     # set pointers for model paramter vector
     model_parameter_pointer: np.ndarray = np.cumsum(np.array([positional_model_params.num_params] + num_ctrl_points))
 
     H: lil_matrix = derivative2(model_parameter_pointer,knots,inversion_params)
 
-    # TODO implement lines 187+ from mp_estimation.py
 
-    # Set priori covariance matrix for model parameters
-    # [[GMP,*],[* , H]]
 
     pmp_mean,cov_inv = positional_model_params.get_mean(),positional_model_params.get_cov_inv()
     # Set priori covariance matrix for model parameters
@@ -52,7 +47,7 @@ def MPestimate(
         print(np.linalg.matrix_rank(Di,tol=1.0e-8),len(eigv_Di))
         print("Di is not full rank")
         sys.exit(1)
-    
+
     log_det_Di = np.log(eigv_Di).sum()
 
     # Set initial params for gradient gamma
@@ -71,10 +66,9 @@ def MPestimate(
     L0 = np.array(transponder_depth_mean) + positional_model_params.site_position_delta.mean[2]
     L0 = abs(L0.mean())*2.0
 
-
     sound_vel_speed:np.ndarray = sound_velocity_data.speed
     sound_vel_depth:np.ndarray = sound_velocity_data.depth
-    
+
     delta_speed = sound_vel_speed[1:] - sound_vel_speed[:-1]
     delta_depth = sound_vel_depth[1:] - sound_vel_depth[:-1]
     # line 233
@@ -87,6 +81,24 @@ def MPestimate(
     T0 = L0/V0
 
     # Implement calc_forward and define "shots" schema, and other inputs
+    """
+        # Initial parameters for gradient gamma
+    shots['sta0_e'] = mp[shots['mtid']+0] + mp[len(MTs)*3+0]  # transponder position + station center position
+    shots['sta0_n'] = mp[shots['mtid']+1] + mp[len(MTs)*3+1]
+    shots['sta0_u'] = mp[shots['mtid']+2] + mp[len(MTs)*3+2]
+    shots['mtde'] = (shots['sta0_e'].values - cnt[0])  # station center position - mean transponder position
+    shots['mtdn'] = (shots['sta0_n'].values - cnt[1])
+    shots['de0'] = shots['ant_e0'].values - shots['ant_e0'].values.mean()  # Normalized antennta positions
+    shots['dn0'] = shots['ant_n0'].values - shots['ant_n0'].values.mean()
+    shots['de1'] = shots['ant_e1'].values - shots['ant_e1'].values.mean()
+    shots['dn1'] = shots['ant_n1'].values - shots['ant_n1'].values.mean()
+    shots['iniflag'] = shots['flag'].copy()
+
+    shots["logTT"] = np.log(shots.TT.values/T0)
 
 
+  if invtyp != 0:
+        shots["gamma"] = 0.
+
+    """
 

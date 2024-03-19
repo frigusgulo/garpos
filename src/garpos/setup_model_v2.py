@@ -12,7 +12,7 @@ from ..schemas.module_io import GaussianModelParameters,Normal
 
 def init_position(
     site_data: Site, inversion_params: InversionParams
-) -> GaussianModelParameters:
+) -> Tuple[List[float], np.ndarray, List[int], Dict[str, int]]:
     """
     Calculate Jacobian matrix for positions.
 

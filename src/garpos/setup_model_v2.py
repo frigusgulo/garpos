@@ -5,7 +5,7 @@ from scipy.sparse import csc_matrix, lil_matrix, linalg, block_diag
 from sksparse.cholmod import cholesky
 import pandas as pd
 
-from ..schemas.obs_data import Site,ATDOffset,Transponder,PositionENU
+from ..schemas.obs_data import Site,ATDOffset,Transponder,PositionENU,DataFrame,ObservationData,SoundVelocityProfile
 from ..schemas.hyp_params import InversionParams,InversionType
 from ..schemas.module_io import GaussianModelParameters,Normal
 
@@ -72,37 +72,30 @@ def init_position(
     return model_params_mean, priori_cov_inv, slvidx0, transponder_idx
 
 
-def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndarray]:
+def make_knots(shot_data: DataFrame[ObservationData], inv_params: InversionParams) -> List[np.ndarray]:
     """
     Create the B-spline knots for correction value "gamma".
 
     Args:
-        shotdat (pd.DataFrame): GNSS-A shot dataset.
-        spdeg (int): Spline degree (=3).
-        knotintervals (List[int]): Approximate knot intervals.
+        shotdat (pd.DataFrame[ObservationData]): GNSS-A shot dataset.
+        inv_params (InversionParams): The inversion parameters.
 
     Returns:
         List[np.ndarray]: B-spline knots for each component in "gamma".
     """
 
-    n_sets = len(shot_data.sets)
+    sets: List[str] = shot_data['set'].unique()
 
-    trans_times_first = np.min(
-        [
-            shot_obs.trans_time[0]
-            for shot_data in list(shot_data.sets)
-            for shot_obs in shot_data.values()
-        ]
-    )
-    trans_times_last = np.max(
-        [
-            shot_obs.trans_time[-1]
-            for shot_data in list(shot_data.sets)
-            for shot_obs in shot_data.values()
-        ]
-    )
+    transmission_times = np.array([shot_data.loc[shot_data.set==s, "transmission_time"].min() for s in sets]).min()
 
-    observation_duration = trans_times_last - trans_times_first
+    reception_times = np.array([shot_data.loc[shot_data.set==s, "reception_time"].max() for s in sets]).max()
+    
+
+    transmission_times_first: float = shot_data.transmission_time.values.min()
+    reception_times_last:float  = shot_data.reception_time.values.max()
+
+    
+    observation_duration: float = transmission_times_first - reception_times_last
 
     # knotintervals = [knotint0, knotint1, knotint1, knotint2, knotint2]
     # Create the B-spline knots for correction value "gamma".
@@ -114,8 +107,9 @@ def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndar
         inv_params.knotint2,
     ]
     n_knots = [int(observation_duration / interval) for interval in knot_intervals]
-    knots = [
-        np.linspace(trans_times_first, trans_times_last, knot + 1) for knot in n_knots
+
+    knots: List[np.ndarray] = [
+        np.linspace(transmission_times_first, reception_times_last, knot + 1) for knot in n_knots
     ]
 
     for k, _ in enumerate(knots):
@@ -123,9 +117,9 @@ def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndar
             knots[k] = np.array([])
         rm_knot = np.array([])
 
-        for i in range(n_sets - 1):
+        for i in range(len(sets) - 1):
             isetkn = np.where(
-                (knots[k] > trans_times_last) & (knots[k] < trans_times_first[i + 1])
+                (knots[k] > transmission_times_first) & (knots[k] < transmission_times_first[i + 1])
             )[0]
             if len(isetkn) > 2 * (inv_params.spline_degree + 2):
                 rmknot = np.append(
@@ -145,12 +139,12 @@ def make_knots(shot_data: ShotData, inv_params: InversionParams) -> List[np.ndar
 
         add_kn_first = np.array(
             [
-                trans_times_first - dkn * (n + 1)
+                transmission_times_first - dkn * (n + 1)
                 for n in reversed(range(inv_params.spline_degree))
             ]
         )
         add_kn_last = np.array(
-            [trans_times_last + dkn * (n + 1) for n in range(inv_params.spline_degree)]
+            [transmission_times_first + dkn * (n + 1) for n in range(inv_params.spline_degree)]
         )
 
         knots[k] = np.append(add_kn_first, knots[k])
@@ -163,7 +157,7 @@ def derivative2(
     model_param_pointer:np.ndarray, knots: List[np.ndarray], inv_params: InversionParams
 ) -> lil_matrix:
     # Calculate the matrix for 2nd derivative of the B-spline basis
-    
+
     lambda_grad = inv_params.log_gradlambda * 10
     lambda_0 = inv_params.log_lambda[0] * 10
     lambdas = [lambda_0] + [lambda_0 * lambda_grad] * 4
@@ -201,7 +195,10 @@ def derivative2(
 
     return H
 
-def data_correlation(shot_data: ShotData, inv_params: InversionParams) -> np.ndarray:
+
+def data_correlation(
+    shot_data: DataFrame[ObservationData],TT0: np.ndarray, inv_params: InversionParams
+) -> np.ndarray:
     """
     Calculate the data correlation matrix.
 
@@ -212,4 +209,29 @@ def data_correlation(shot_data: ShotData, inv_params: InversionParams) -> np.nda
     Returns:
         np.ndarray: The data correlation matrix.
     """
-    pass
+    n_data = shot_data.shape[0]
+    transmission_times = shot_data.transmission_time.values
+    mtids = shot_data.mtid.values
+    negative_delta_transmission_times: List = shot_data[
+        (shot_data.transmission_times.diff(1) == 0.0) & (shot_data.mtid.diff(1) == 0.0)
+    ]
+
+    if len(negative_delta_transmission_times) > 0:
+        print("transmission times have negative delta")
+        print("error in data_var_base; see setup_model.py")
+        sys.exit(1)
+
+    E = lil_matrix((n_data, n_data))
+    for i, (iMT,iST) in enumerate(zip(mtids,transmission_times)):
+        idx = shot_data[ ( abs(transmission_times - iST) < inv_params.mu_t * 4.)].index
+        dshot = np.abs(iST - transmission_times[idx]) / inv_params.mu_t
+        dcorr = np.exp(-dshot) * (inv_params.mu_mt + (1.0 - inv_params.mu_mt) * (iMT == mtids[idx]))
+        E[i, idx] = dcorr / TT0[i] / TT0[idx]
+
+    E = E.tocsc()
+
+    # cholesky decomposition
+    E_factor = cholesky(E, ordering_method="natural")
+
+    return E_factor
+

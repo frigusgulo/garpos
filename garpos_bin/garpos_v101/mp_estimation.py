@@ -16,7 +16,7 @@ import math
 import configparser
 import numpy as np
 from scipy.sparse import csr_matrix, csc_matrix, lil_matrix, linalg, identity
-# from sksparse.cholmod import cholesky
+from sksparse.cholmod import cholesky
 import pandas as pd
 import pdb
 from typing import List

@@ -156,13 +156,13 @@ class Site(BaseModel):
     shot_data: DataFrame[ObservationData]
     sound_speed_data: DataFrame[SoundVelocityProfile]
 
-# class AntennaPosition(BaseModel):
-#     east: float
-#     north: float
-#     up: float
-#     heading: float
-#     pitch: float
-#     roll: float
+class AntennaPosition(BaseModel):
+    east: float
+    north: float
+    up: float
+    heading: float
+    pitch: float
+    roll: float
 
 # class ShotObservations(BaseModel):
 #     line_number: int

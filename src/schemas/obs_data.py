@@ -34,7 +34,7 @@ class ObservationData(pa.DataFrameModel):
 
     set: Series[str] = pa.Field(description="Set name", alias="SET")
     line: Series[str] = pa.Field(description="Line name", alias="LN")
-    transponder_id: Series[Transponder.id] = pa.Field(
+    transponder_id: Series[str] = pa.Field(
         description="Station name", alias="MT"
     )
     travel_time: Series[float] = pa.Field(description="Travel time [sec]", alias="TT")
@@ -144,41 +144,32 @@ class ATDOffset(BaseModel):
 class Transponder(BaseModel):
     id: str
     position_enu: PositionENU
+    position_array_enu: PositionENU
+
+class SiteData(BaseModel):
+    center_enu: PositionENU
+    center_llh: PositionLLH
+    transonders: List[Transponder]
+
+class ModelParameters(BaseModel):
+    delta_center_position: PositionENU
+    atd_offset: ATDOffset
+    transponder_delta_position: Optional[List[PositionENU]] = None
 
 class Site(BaseModel):
     name: str
     campaign: Optional[str] = None
-    transponders: List[Transponder]
-    delta_center_position: PositionENU
-    atd_offset: ATDOffset
-    center_enu: PositionENU
-    center_llh: PositionLLH
+    date_utc: datetime
+    date_mjd: float
+    ref_frame: str = "ITRF2014"
+    site_data: SiteData
+
     shot_data: DataFrame[ObservationData]
     sound_speed_data: DataFrame[SoundVelocityProfile]
+    n_shot: Optional[int] = 0
+    used_shot: Optional[int] = 0
 
-class AntennaPosition(BaseModel):
-    east: float
-    north: float
-    up: float
-    heading: float
-    pitch: float
-    roll: float
-
-# class ShotObservations(BaseModel):
-#     line_number: int
-#     travel_time: List[float] # Observed travel time between transmission and reception of the signal [s]
-#     trans_time: List[float] # Time of transmission of the signal in MJD [s]
-#     recep_time: List[float] # Time of reception of the signal in MJD [s]
-#     antenna_trn: List[AntennaPosition] # Antenna position at the time of transmission
-#     antenna_rcv: List[AntennaPosition] # Antenna position at the time of reception
-
-# class ShotData(BaseModel):
-#     number: int 
-#     date_utc: datetime
-#     date_mjd: float
-#     ref_frame: str = "ITRF2014"
-#     transponders: List[Transponder]
-#     sets: List[Dict[Transponder.id,ShotObservations]]
+    model_parameters: Optional[ModelParameters] = None
 
 
 class ModelResults(ObservationData):

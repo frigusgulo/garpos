@@ -14,6 +14,7 @@ from scipy.sparse import (
 from sksparse.cholmod import cholesky
 import pandas as pd
 from typing import List, Tuple, Dict
+import logging
 
 # garpos module
 from ..schemas.hyp_params import InversionParams, InversionType
@@ -328,23 +329,6 @@ def MPestimate(site_data: Site, inversion_params: InversionParams, suf: str):
             inversion_params=inversion_params,
         )
 
-        # calc_forward(site_data.shot_data, mp, number_transponders, icfg, svp, T0)
-
-        # for mis-response in MT number (e.g., TU sites) verification
-        # if chkMT and iconv >= 1:
-        #     print("Check MT number for shots named 'M00'")
-        #     comment += "Check MT number for shots named 'M00'\n"
-        #     rsigm0 = 1.0
-        #     aveRTT = shots[~shots["flag"]].ResiTT.mean()
-        #     sigRTT = shots[~shots["flag"]].ResiTT.std()
-        #     th0 = aveRTT + rsigm0 * sigRTT
-        #     th1 = aveRTT - rsigm0 * sigRTT
-        #     shots.loc[(shots.m0flag), ["flag"]] = (shots["ResiTT"] > th0) | (
-        #         shots["ResiTT"] < th1
-        #     )
-        #     aveRTT1 = shots[~shots["flag"]].ResiTT.mean()
-        #     sigRTT1 = shots[~shots["flag"]].ResiTT.std()
-
         tmp = (
             site_data.shot_data[~site_data.shot_data["flag"]]
             .reset_index(drop=True)
@@ -393,14 +377,10 @@ def MPestimate(site_data: Site, inversion_params: InversionParams, suf: str):
         ### Check Conv ###
         ##################
 
+        logging.info(
+            f"Loop {iloop + 1}, RMS(TT) = {datarms * 1000.0} ms, used_shot = {ratio:.1f}%, reject = {reject}, Max(dX) = {dxmax:.4f}, Hgt = {aved:.3f}"
+        )
         mode = "Inversion-type %1d" % inversion_params.inversiontype
-
-        loopres = "%s Loop %2d-%2d, " % (mode, 1, iloop + 1)
-        loopres += "RMS(TT) = %10.6f ms, " % (datarms * 1000.0)
-        loopres += "used_shot = %5.1f%%, reject = %4d, " % (ratio, reject)
-        loopres += "Max(dX) = %10.4f, Hgt = %10.3f" % (dxmax, aved)
-        print(loopres)
-        comment += "#" + loopres + "\n"
 
         if (
             dxmax < inversion_params.convcriteria / 100.0
@@ -431,24 +411,17 @@ def MPestimate(site_data: Site, inversion_params: InversionParams, suf: str):
         C = S / dof * Ck.toarray()
         rmsmisfit = (misfit / ndata) ** 0.5 * sigobs
 
-        finalres = " ABIC = %18.6f " % abic
-        finalres += " misfit = % 6.3f " % (rmsmisfit * 1000.0)
-        finalres += suf
-        print(finalres)
-        comment += "# " + finalres + "\n"
+      
 
-        comment += "# lambda_0^2 = %12.8f\n" % inversion_params.log_lambda * 10
-        comment += "# lambda_g^2 = %12.8f\n" % (
-            inversion_params.log_lambda * 10 * inversion_params.log_gradlambda * 10
+        logging.info(
+            f"ABIC = {abic:.6f}, misfit = {rmsmisfit * 1000.0:.3f} ms, {mode}\n\
+            lambda_0^2 = {inversion_params.log_lambda * 10:.8f},\
+            lambda_g^2 = {inversion_params.log_lambda * 10 * inversion_params.log_gradlambda * 10:.8f},\
+            mu_t = {inversion_params.mu_t:.8f} sec., mu_MT = {inversion_params.mu_mt:.4f}"
         )
-        comment += "# mu_t = %12.8f sec.\n" % inversion_params.mu_t
-        comment += "# mu_MT = %5.4f\n" % inversion_params.mu_mt
-
 
         # TODO implement outresults
 
-
-        
         #####################
         # Write Result data #
         #####################

@@ -111,6 +111,9 @@ class PositionENU(BaseModel):
     def get_position(self) -> List[float]:
         return [self.east.value,self.north.value,self.up.value]
     
+    def get_std_dev(self) -> List[float]:
+        return [self.east.sigma,self.north.sigma,self.up.sigma]
+    
     def get_covariance(self) -> np.ndarray:
         cov_mat = np.diag([self.east.sigma**2,self.north.sigma**2,self.up.sigma**2])
         cov_mat[0,1] = cov_mat[1,0] = self.cov_en**2
@@ -134,6 +137,8 @@ class ATDOffset(BaseModel):
     def get_offset(self) -> List[float]:
         return [self.forward.value,self.rightward.value,self.downward.value]
     
+    def get_std_dev(self) -> List[float]:
+        return [self.forward.sigma,self.rightward.sigma,self.downward.sigma]
     def get_covariance(self) -> np.ndarray:
         cov_mat = np.diag([self.forward.sigma**2,self.rightward.sigma**2,self.downward.sigma**2])
         cov_mat[0,1] = cov_mat[1,0] = self.cov_fr**2
@@ -144,12 +149,12 @@ class ATDOffset(BaseModel):
 class Transponder(BaseModel):
     id: str
     position_enu: PositionENU
-    position_array_enu: PositionENU
+    #position_array_enu: PositionENU
 
 class SiteData(BaseModel):
     center_enu: PositionENU
     center_llh: PositionLLH
-    transonders: List[Transponder]
+    transponders: List[Transponder]
 
 class ModelParameters(BaseModel):
     delta_center_position: PositionENU
@@ -163,13 +168,11 @@ class Site(BaseModel):
     date_mjd: float
     ref_frame: str = "ITRF2014"
     site_data: SiteData
+    atd_offset: ATDOffset
+    delta_center_position: PositionENU
 
     shot_data: DataFrame[ObservationData]
     sound_speed_data: DataFrame[SoundVelocityProfile]
-    n_shot: Optional[int] = 0
-    used_shot: Optional[int] = 0
-
-    model_parameters: Optional[ModelParameters] = None
 
 
 class ModelResults(ObservationData):

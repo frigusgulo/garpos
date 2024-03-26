@@ -3,7 +3,7 @@ import numpy as np
 from pandas import DataFrame
 import sys
 # Internal Imports
-from .ray_tracer import Raytracer
+from ...src_2.ray_tracer import Raytracer
 from ..schemas.obs_data import ObservationData,SoundVelocityProfile
 # TODO need a way to index model params by shot_data.mtid
 # TODO what are shot_data.pl* values?

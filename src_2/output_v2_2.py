@@ -216,3 +216,5 @@ def output_results(
         shot_data=shots,
         sound_speed_data=svp,
     )
+
+    return site

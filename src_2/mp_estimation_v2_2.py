@@ -51,8 +51,8 @@ def MPestimate_v2(
     atd_offset: ATDOffset,
     transponders: List[Transponder],
     delta_center_position: PositionENU,
-    site_name: str,
     stations: List[str],
+    site_name: str,
     lamb0: float,
     lgrad: float,
     mu_t: float,
@@ -67,7 +67,7 @@ def MPestimate_v2(
     ConvCriteria: float,
     spdeg: int,
     denu: Optional[np.ndarray] = None,
-) -> str:
+) -> Tuple:
     """
     Estimate model parameters using the Maximum Posteriori (MP) method.
     """
@@ -241,6 +241,7 @@ def MPestimate_v2(
     #############################
     comment = ""
     iconv = 0
+    loop_results = []
     for iloop in range(maxloop):
 
         # tmp contains unrejected data
@@ -387,12 +388,16 @@ def MPestimate_v2(
         ##################
         ### Check Conv ###
         ##################
-        loopres = "%s Loop %2d-%2d, " % (mode, 1, iloop + 1)
-        loopres += "RMS(TT) = %10.6f ms, " % (datarms * 1000.0)
-        loopres += "used_shot = %5.1f%%, reject = %4d, " % (ratio, reject)
-        loopres += "Max(dX) = %10.4f, Hgt = %10.3f" % (dxmax, aved)
-        print(loopres)
-        comment += "#" + loopres + "\n"
+        loopres = {
+            "mode": mode,
+            "loop": iloop + 1,
+            "rms": datarms * 1000.0,
+            "used_shot": ratio,
+            "reject": reject,
+            "dxmax": dxmax,
+            "aved": aved,
+        }
+        loop_results.append(loopres)
 
         if (
             dxmax < ConvCriteria / 100.0 or dposmax < ConvCriteria / 1000.0
@@ -420,31 +425,39 @@ def MPestimate_v2(
     C = S / dof * Ck.toarray()
     rmsmisfit = (misfit / ndata) ** 0.5 * sigobs
 
-    #TODO come up with elegant way to return results
+    abic_results = {
+        "ABIC": abic, # akaike bayesian information criterion
+        "rmsmisfit": rmsmisfit * 1000.0,
+        "sigobs": sigobs,
+        "conv_criteria": rsig,
+        "mu_t": mu_t, # Correlation length (in sec.)
+        "mu_m": mu_m, # Ratio of correlation between the different transponders.
+        "lamb0": lamb0, 
+        "lgrad": lgrad,
+        "deltab": deltab,
+        "deltap": deltap,
+        "scale": scale, # time scale factor
+        "maxloop": maxloop,
+    }
 
-    # TODO write schema for model hyper-params and error metrics
-    # - ABIC, RMS, rmsmisfit, sigobs,rsig, mu_t, mu_m, lamb0, lgrad,deltab, deltap, scale, maxloop, ConvCriteria, spdeg,knots,denu
+    site_data_results = output_results(
+        site_name=site_name,
+        campaign="",
+        date_utc="",
+        date_jday="",
+        ref_frame="",
+        latitude=0.0,
+        longitude=0.0,
+        height=0.0,
+        imp0=imp0,
+        slvidx0=slvidx0,
+        C=C,
+        mp=mp,
+        MTs=MTs,
+        shots=shots,
+        svp=svp,
+        mtidx=mtidx,
+    )
 
-        # ideally have the model params/ ABIC/Misfit as results metadata
-    
+    return (site_data_results, abic_results, loop_results)
 
-    # finalres = " ABIC = %18.6f " % abic
-    # finalres += " misfit = % 6.3f " % (rmsmisfit * 1000.0)
-    # finalres += suf
-    # print(finalres)
-    # comment += "# " + finalres + "\n"
-
-    # comment += "# lambda_0^2 = %12.8f\n" % lamb0
-    # comment += "# lambda_g^2 = %12.8f\n" % (lamb0 * lgrad)
-    # comment += "# mu_t = %12.8f sec.\n" % mu_t
-    # comment += "# mu_MT = %5.4f\n" % mu_m
-
-    # #####################
-    # # Write Result data #
-    # #####################
-
-    # resf, dcpos = outresults(
-    #     odir, suf, cfg, invtyp, imp0, slvidx0, C, mp, shots, comment, MTs, mtidx, av
-    # )
-
-    # return [resf, datarms, abic, dcpos]

@@ -20,117 +20,125 @@ from typing import List,Dict
 import numpy as np
 import logging
 
-from .schemas import ATDOffset
+from schemas import ATDOffset
+
 
 def init_position(
-		station_dpos:Dict[str,List[float]], # dict of station name, and list of position [east,north,up,std_east,std_north,std_up]
-		array_dcnt: List[float], # list of array center position [east,north,up,std_east,std_north,std_up]
-		atd_offset: List[float],# list of ATD offset [forward,rightward,downward,std_forward,std_rightward,std_downward]
-		denu:List[float], 
-		MTs: List[str]):
-	"""
-	Calculate Jacobian matrix for positions.
+    station_dpos: Dict[
+        str, List[float]
+    ],  # dict of station name, and list of position [east,north,up,std_east,std_north,std_up]
+    array_dcnt: List[
+        float
+    ],  # list of array center position [east,north,up,std_east,std_north,std_up]
+    atd_offset: List[
+        float
+    ],  # list of ATD offset [forward,rightward,downward,std_forward,std_rightward,std_downward]
+    MTs: List[str],
+    denu: List[float] = [0, 0, 0],  # list of position (mainly for particle filters)
+):
+    """
+    Calculate Jacobian matrix for positions.
 
-	Parameters
-	----------
-	station_dpos : dict[str,List[float]]
-		Dictionary of station name and positions
-	
-	array_dcnt : List[float]
-		Array center position [east,north,up,std_east,std_north,std_up]
-	
-	atd_offset : List[float]
-		ATD offset [forward,rightward,downward,std_forward,std_rightward,std_downward]
-		
-	denu : ndarray
-		Input of position (mainly for particle filters).
-	MTs : list
-		List of transponders' name.
+    Parameters
+    ----------
+    station_dpos : dict[str,List[float]]
+            Dictionary of station name and positions
 
-	Returns
-	-------
-	mp : ndarray
-		complete model parameter vector. (only for position)
-	Dipos : csc_matrix
-		A priori covariance for position.
-	slvidx0 : list
-		Indices of model parameters to be solved. (only for position)
-	mtidx : dictionary
-		Indices of mp for each MT.
-	"""
+    array_dcnt : List[float]
+            Array center position [east,north,up,std_east,std_north,std_up]
 
-	for mt in MTs:
-		if mt not in list(station_dpos.keys()):
-			response = f"MT {mt} not found in station_dpos"
-			logging.error(response)
-			raise ValueError(response)
+    atd_offset : List[float]
+            ATD offset [forward,rightward,downward,std_forward,std_rightward,std_downward]
 
-	mtidx = {}
-	mp = np.array([])
-	ae = np.array([])
-	for imt, mt in enumerate(MTs):
-		mtidx[mt] = imt * 3
-		dpos = station_dpos[mt]
-		dpos = list(map(float, dpos))
-		# creating 2d array for station position
-		mp = np.append(mp, dpos[0:3])
-		# creating 2d array for station psotion uncertainty
-		ae = np.append(ae, dpos[3:6])
+    denu : ndarray
+            Input of position (mainly for particle filters).
+    MTs : list
+            List of transponders' name.
 
-	dcnt = list(map(float, array_dcnt))
-	# what is denu?
-	mp = np.append(mp, dcnt[0:3]+denu[0:3])
-	ae = np.append(ae, dcnt[3:6])
-	if len(dcnt) <= 6:
-		covNU = 0.0
-		covUE = 0.0
-		covEN = 0.0
-	else:
-		covNU = dcnt[6]
-		covUE = dcnt[7]
-		covEN = dcnt[8]
-	if ae[len(MTs)*3:].sum() > 0.001 and ae[0:len(MTs)*3].sum() > 0.001:
-		print("Error: ape for each station must be 0 in rigid-array mode!")
-		sys.exit(1)
+    Returns
+    -------
+    mp : ndarray
+            complete model parameter vector. (only for position)
+    Dipos : csc_matrix
+            A priori covariance for position.
+    slvidx0 : list
+            Indices of model parameters to be solved. (only for position)
+    mtidx : dictionary
+            Indices of mp for each MT.
+    """
 
-	atd = atd_offset.get_offset()
-	atd += atd_offset.get_std_dev()
+    for mt in MTs:
+        if mt not in list(station_dpos.keys()):
+            response = f"MT {mt} not found in station_dpos"
+            logging.error(response)
+            raise ValueError(response)
 
-	atd = list(map(float, atd))
-	mp = np.append(mp, atd[0:3])
-	if atd[3] > 1.e-8:
-		ae = np.append(ae, 3.0)
-	else:
-		ae = np.append(ae, 0.0)
-	if atd[4] > 1.e-8:
-		ae = np.append(ae, 3.0)
-	else:
-		ae = np.append(ae, 0.0)
-	if atd[5] > 1.e-8:
-		ae = np.append(ae, 3.0)
-	else:
-		ae = np.append(ae, 0.0)
+    mtidx = {}
+    mp = np.array([])
+    ae = np.array([])
+    for imt, mt in enumerate(MTs):
+        mtidx[mt] = imt * 3
+        dpos = station_dpos[mt]
+        dpos = list(map(float, dpos))
+        # creating 2d array for station position
+        mp = np.append(mp, dpos[0:3])
+        # creating 2d array for station psotion uncertainty
+        ae = np.append(ae, dpos[3:6])
 
-	# set a priori variance for position parameters
-	D0pos = lil_matrix(np.diag( ae**2. ))
-	# set a priori covariance for dCentPos
-	D0pos[len(MTs)*3+1,len(MTs)*3+2] = covNU
-	D0pos[len(MTs)*3+2,len(MTs)*3+0] = covUE
-	D0pos[len(MTs)*3+0,len(MTs)*3+1] = covEN
-	D0pos[len(MTs)*3+2,len(MTs)*3+1] = covNU
-	D0pos[len(MTs)*3+0,len(MTs)*3+2] = covUE
-	D0pos[len(MTs)*3+1,len(MTs)*3+0] = covEN
+    dcnt = list(map(float, array_dcnt))
+    # what is denu?
+    mp = np.append(mp, dcnt[0:3]+denu[0:3])
+    ae = np.append(ae, dcnt[3:6])
+    if len(dcnt) <= 6:
+        covNU = 0.0
+        covUE = 0.0
+        covEN = 0.0
+    else:
+        covNU = dcnt[6]
+        covUE = dcnt[7]
+        covEN = dcnt[8]
+    if ae[len(MTs)*3:].sum() > 0.001 and ae[0:len(MTs)*3].sum() > 0.001:
+        print("Error: ape for each station must be 0 in rigid-array mode!")
+        sys.exit(1)
 
-	slvidx0 = np.where( ae > 1.e-14 )[0]
-	nmppos = len(slvidx0)
-	Dpos = lil_matrix( (nmppos, nmppos) )
-	for i, ipos in enumerate(slvidx0):
-		for j, jpos in enumerate(slvidx0):
-			Dpos[i, j] = D0pos[ipos,jpos]
-	Dpos = Dpos.tocsc()
-	Dipos = linalg.inv( Dpos )
+    atd = atd_offset.get_offset()
+    atd += atd_offset.get_std_dev()
 
-	return mp, Dipos, slvidx0, mtidx
+    atd = list(map(float, atd))
+    mp = np.append(mp, atd[0:3])
+    if atd[3] > 1.e-8:
+        ae = np.append(ae, 3.0)
+    else:
+        ae = np.append(ae, 0.0)
+    if atd[4] > 1.e-8:
+        ae = np.append(ae, 3.0)
+    else:
+        ae = np.append(ae, 0.0)
+    if atd[5] > 1.e-8:
+        ae = np.append(ae, 3.0)
+    else:
+        ae = np.append(ae, 0.0)
+
+    # set a priori variance for position parameters
+    D0pos = lil_matrix(np.diag( ae**2. ))
+    # set a priori covariance for dCentPos
+    D0pos[len(MTs)*3+1,len(MTs)*3+2] = covNU
+    D0pos[len(MTs)*3+2,len(MTs)*3+0] = covUE
+    D0pos[len(MTs)*3+0,len(MTs)*3+1] = covEN
+    D0pos[len(MTs)*3+2,len(MTs)*3+1] = covNU
+    D0pos[len(MTs)*3+0,len(MTs)*3+2] = covUE
+    D0pos[len(MTs)*3+1,len(MTs)*3+0] = covEN
+
+    slvidx0 = np.where( ae > 1.e-14 )[0]
+    nmppos = len(slvidx0)
+    Dpos = lil_matrix( (nmppos, nmppos) )
+    for i, ipos in enumerate(slvidx0):
+        for j, jpos in enumerate(slvidx0):
+            Dpos[i, j] = D0pos[ipos,jpos]
+    Dpos = Dpos.tocsc()
+    Dipos = linalg.inv( Dpos )
+
+    return mp, Dipos, slvidx0, mtidx
 
 
 def make_knots(shotdat, spdeg, knotintervals):

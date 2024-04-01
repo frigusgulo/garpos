@@ -1,10 +1,11 @@
 import os
 import numpy as np
 from typing import List,Optional
-from pandas import DataFrame
+from pandera.typing import DataFrame
+#from pandas import DataFrame
 from pydantic import BaseModel
 from datetime import datetime
-from .schemas import InversionType,SoundVelocityProfile,ObservationData
+from schemas import InversionType,SoundVelocityProfile,ObservationData
 
 class Point(BaseModel):
     value: float

@@ -17,8 +17,8 @@ from typing import List, Tuple, Dict, Optional
 import logging
 
 # garpos module
-from .schemas.hyp_params import InversionParams, InversionType
-from .schemas.obs_data import (
+from schemas.hyp_params import InversionParams, InversionType
+from schemas.obs_data import (
     Site,
     ATDOffset,
     Transponder,
@@ -27,17 +27,17 @@ from .schemas.obs_data import (
     ObservationData,
     DataFrame,
 )
-from .schemas.module_io import GaussianModelParameters
-from .setup_model_v2_2 import init_position, make_knots, derivative2, data_correlation
-from .forward_v2_2 import calc_forward, calc_gamma, jacobian_pos
+from schemas.module_io import GaussianModelParameters
+from setup_model_v2_2 import init_position, make_knots, derivative2, data_correlation
+from forward_v2_2 import calc_forward, calc_gamma, jacobian_pos
 
-from .ray_tracer import Raytracer
+from ray_tracer import Raytracer
 
 # from .forward_v2 import calc_forward, calc_gamma, jacobian_pos
 # from .output import outresults
 # Configure logging
 
-from .output_v2_2 import output_results
+from output_v2_2 import output_results
 
 logging.basicConfig(
     level=logging.ERROR, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -66,7 +66,8 @@ def MPestimate_v2(
     maxloop: int,
     ConvCriteria: float,
     spdeg: int,
-    denu: Optional[np.ndarray] = None,
+    denu: Optional[np.ndarray] = [0,0,0,0,0,0],
+    **kwargs,
 ) -> Tuple:
     """
     Estimate model parameters using the Maximum Posteriori (MP) method.
@@ -108,7 +109,7 @@ def MPestimate_v2(
     mode = invtype.value
 
     station_dpos = {
-        trns.id: trns.position_enu.get_offset() + trns.position_enu.get_std_dev()
+        trns.id: trns.position_enu.get_position() + trns.position_enu.get_std_dev()
         for trns in transponders
     }
     atd_offset_params: List[float] = atd_offset.get_offset() + atd_offset.get_std_dev()
@@ -119,7 +120,7 @@ def MPestimate_v2(
     mppos, Dipos, slvidx0, mtidx = init_position(
         station_dpos=station_dpos,
         array_dcnt=station_array_dcnt,
-        atd_offset=atd_offset_params,
+        atd_offset=atd_offset,
         denu=denu,
         MTs=MTs,
     )
@@ -164,7 +165,7 @@ def MPestimate_v2(
     nmp = len(mp0)
 
     ### Set a priori covariance for model parameters ###
-
+    print(nmp)
     Di = lil_matrix((nmp, nmp))
     Di[:nmppos, :nmppos] = Dipos
     Di[nmppos:, nmppos:] = H
@@ -460,4 +461,5 @@ def MPestimate_v2(
     )
 
     return (site_data_results, abic_results, loop_results)
+
 

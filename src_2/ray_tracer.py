@@ -7,7 +7,7 @@ import logging
 import sys
 
 LIB_DIR = os.path.join(os.path.dirname(__file__), "f90lib")
-LIB_RAYTRACE = os.path.join("libraytrace.so")
+LIB_RAYTRACE = os.path.join(LIB_DIR,"lib_raytrace.so")
 
 
 class Raytracer:

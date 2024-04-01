@@ -39,7 +39,7 @@ class InversionParams(BaseModel):
     deltab: float = Field(default=1.0e-6,description="Infinitesimal values to make Jacobian matrix")
     
 
-    @root_validator
+    @root_validator(pre=True)
     def validate(cls,values):
         match values['inversiontype']:
             case InversionType.gammas:

@@ -9,14 +9,13 @@ Contains:
 import numpy as np
 from scipy.interpolate import BSpline
 from scipy.sparse import lil_matrix
-from pandas import DataFrame
+
 # garpos module
+from .coordinate_trans import corr_attitude
+from .traveltime import calc_traveltime
 
-from utils import corr_attitude
-from traveltime import calc_traveltime
-from ray_tracer import Raytracer
 
-def calc_forward(ray_tracer:Raytracer,shots:DataFrame, mp, svp, T0,rsig:float,nMT):
+def calc_forward(shots, mp, nMT, icfg, svp, T0):
 	"""
 	Calculate the forward modeling of observation eqs.
 
@@ -41,7 +40,7 @@ def calc_forward(ray_tracer:Raytracer,shots:DataFrame, mp, svp, T0,rsig:float,nM
 		GNSS-A shot dataset in which calculated data is added.
 	"""
 
-
+	rsig = float(icfg.get("Inv-parameter","RejectCriteria"))
 
 	# calc ATD offset
 	calATD = np.vectorize(corr_attitude)
@@ -64,7 +63,7 @@ def calc_forward(ray_tracer:Raytracer,shots:DataFrame, mp, svp, T0,rsig:float,nM
 	shots['plu1'] = plu1
 
 	# calc Residuals
-	cTT, cTO = ray_tracer.calc_traveltime(shots, mp, nMT, svp)
+	cTT, cTO = calc_traveltime(shots, mp, nMT, icfg, svp)
 	logTTc = np.log( cTT/T0 ) - shots.gamma.values
 	ResiTT = shots.logTT.values - logTTc
 
@@ -151,8 +150,8 @@ def calc_gamma(mp, shotdat, imp0, spdeg, knots):
 	return gamma, a
 
 
-def jacobian_pos(ray_tracer: Raytracer,deltap,deltab, mp, slvidx0, shotdat, mtidx, svp, T0):
-    """
+def jacobian_pos(icfg, mp, slvidx0, shotdat, mtidx, svp, T0):
+	"""
 	Calculate Jacobian matrix for positions.
 
 	Parameters
@@ -178,98 +177,98 @@ def jacobian_pos(ray_tracer: Raytracer,deltap,deltab, mp, slvidx0, shotdat, mtid
 		Jacobian matrix for positions.
 	"""
 
-    # read inversion parameters
+	# read inversion parameters
+	deltap = float(icfg.get("Inv-parameter","deltap"))
+	deltab = float(icfg.get("Inv-parameter","deltab"))
 
-    ndata = shotdat.index.size
+	ndata = shotdat.index.size
 
-    MTs = mtidx.keys()
-    nMT = len(MTs)
-    nmppos = len(slvidx0)
+	MTs = mtidx.keys()
+	nMT = len(MTs)
+	nmppos = len(slvidx0)
 
-    jcbpos = lil_matrix((nmppos, ndata))
-    imp = 0
+	jcbpos  = lil_matrix( (nmppos, ndata) )
+	imp = 0
 
-    gamma = shotdat.gamma.values
-    logTTc = shotdat.logTTc.values
-    ##################################
-    ### Calc Jacobian for Position ###
-    ##################################
-    # for eastward
-    mpj = mp.copy()
-    mpj[nMT * 3 + 0] += deltap
-    cTTj, cTOj = ray_tracer.calc_traveltime(
-        shotdat=shotdat, mp=mpj, nMT=nMT, svp=svp
-    )  # calc_traveltime(shotdat, mpj, nMT, icfg, svp)
-    logTTcj = np.log(cTTj / T0) - gamma
-    shotdat["jacob0"] = (logTTcj - logTTc) / deltap
-    # for northward
-    mpj = mp.copy()
-    mpj[nMT * 3 + 1] += deltap
-    cTTj, cTOj = ray_tracer.calc_traveltime(shotdat=shotdat, mp=mpj, nMT=nMT, svp=svp)
-    logTTcj = np.log(cTTj / T0) - gamma
-    shotdat["jacob1"] = (logTTcj - logTTc) / deltap
-    # for upward
-    mpj = mp.copy()
-    mpj[nMT * 3 + 2] += deltap
-    cTTj, cTOj = ray_tracer.calc_traveltime(shotdat=shotdat, mp=mpj, nMT=nMT, svp=svp)
-    logTTcj = np.log(cTTj / T0) - gamma
-    shotdat["jacob2"] = (logTTcj - logTTc) / deltap
+	gamma = shotdat.gamma.values
+	logTTc = shotdat.logTTc.values
+	##################################
+	### Calc Jacobian for Position ###
+	##################################
+	# for eastward
+	mpj = mp.copy()
+	mpj[nMT*3 + 0] += deltap
+	cTTj, cTOj = calc_traveltime(shotdat, mpj, nMT, icfg, svp)
+	logTTcj = np.log( cTTj/T0 ) - gamma
+	shotdat['jacob0'] = (logTTcj - logTTc) / deltap
+	# for northward
+	mpj = mp.copy()
+	mpj[nMT*3 + 1] += deltap
+	cTTj, cTOj = calc_traveltime(shotdat, mpj, nMT, icfg, svp)
+	logTTcj = np.log( cTTj/T0 ) - gamma
+	shotdat['jacob1'] = (logTTcj - logTTc) / deltap
+	# for upward
+	mpj = mp.copy()
+	mpj[nMT*3 + 2] += deltap
+	cTTj, cTOj = calc_traveltime(shotdat, mpj, nMT, icfg, svp)
+	logTTcj = np.log( cTTj/T0 ) - gamma
+	shotdat['jacob2'] = (logTTcj - logTTc) / deltap
 
-    ### Jacobian for each MT ###
-    for mt in MTs:
-        for j in range(3):
-            idx = mtidx[mt] + j
-            if not (idx in slvidx0):
-                continue
-            jccode = "jacob%1d" % j
-            shotdat["hit"] = shotdat[jccode] * (shotdat["MT"] == mt)
-            jcbpos[imp, :] = np.array([shotdat.hit.values])
-            imp += 1
+	### Jacobian for each MT ###
+	for mt in MTs:
+		for j in range(3):
+			idx = mtidx[mt] + j
+			if not (idx in  slvidx0):
+				continue
+			jccode = "jacob%1d" % j
+			shotdat['hit'] = shotdat[jccode] * (shotdat['MT'] == mt)
+			jcbpos[imp,:] = np.array([shotdat.hit.values])
+			imp += 1
 
-    ### Jacobian for Center Pos ###
-    for j in range(3):
-        idx = nMT * 3 + j
-        if not (idx in slvidx0):
-            continue
-        jccode = "jacob%1d" % j
-        jcbpos[imp, :] = shotdat[jccode].values
-        imp += 1
+	### Jacobian for Center Pos ###
+	for j in range(3):
+		idx = nMT*3 + j
+		if not (idx in  slvidx0):
+			continue
+		jccode = "jacob%1d" % j
+		jcbpos[imp,:] = shotdat[jccode].values
+		imp += 1
 
-    ####################################
-    ### Calc Jacobian for ATD offset ###
-    ####################################
-    for j in range(3):  # j = 0:rightward, 1:forward, 2:upward
-        idx = nMT * 3 + 3 + j
-        if not (idx in slvidx0):
-            continue
-        # calc Jacobian
-        mpj = mp.copy()
-        mpj[(nMT + 1) * 3 + j] += deltap
-        tmpj = shotdat.copy()
+	####################################
+	### Calc Jacobian for ATD offset ###
+	####################################
+	for j in range(3): # j = 0:rightward, 1:forward, 2:upward
+		idx = nMT*3 + 3 + j
+		if not (idx in  slvidx0):
+			continue
+		# calc Jacobian
+		mpj = mp.copy()
+		mpj[(nMT+1)*3 + j] += deltap
+		tmpj = shotdat.copy()
 
-        # calc ATD offset
-        calATD = np.vectorize(corr_attitude)
-        pl0 = mpj[(nMT + 1) * 3 + 0]
-        pl1 = mpj[(nMT + 1) * 3 + 1]
-        pl2 = mpj[(nMT + 1) * 3 + 2]
-        hd0 = shotdat.head0.values
-        hd1 = shotdat.head1.values
-        rl0 = shotdat.roll0.values
-        rl1 = shotdat.roll1.values
-        pc0 = shotdat.pitch0.values
-        pc1 = shotdat.pitch1.values
-        ple0, pln0, plu0 = calATD(pl0, pl1, pl2, hd0, rl0, pc0)
-        ple1, pln1, plu1 = calATD(pl0, pl1, pl2, hd1, rl1, pc1)
-        tmpj["ple0"] = ple0
-        tmpj["pln0"] = pln0
-        tmpj["plu0"] = plu0
-        tmpj["ple1"] = ple1
-        tmpj["pln1"] = pln1
-        tmpj["plu1"] = plu1
+		# calc ATD offset
+		calATD = np.vectorize(corr_attitude)
+		pl0 = mpj[(nMT+1)*3 + 0]
+		pl1 = mpj[(nMT+1)*3 + 1]
+		pl2 = mpj[(nMT+1)*3 + 2]
+		hd0 = shotdat.head0.values
+		hd1 = shotdat.head1.values
+		rl0 = shotdat.roll0.values
+		rl1 = shotdat.roll1.values
+		pc0 = shotdat.pitch0.values
+		pc1 = shotdat.pitch1.values
+		ple0, pln0, plu0 = calATD(pl0, pl1, pl2, hd0, rl0, pc0)
+		ple1, pln1, plu1 = calATD(pl0, pl1, pl2, hd1, rl1, pc1)
+		tmpj['ple0'] = ple0
+		tmpj['pln0'] = pln0
+		tmpj['plu0'] = plu0
+		tmpj['ple1'] = ple1
+		tmpj['pln1'] = pln1
+		tmpj['plu1'] = plu1
 
-        cTTj, cTOj = ray_tracer.calc_traveltime(tmpj, mpj, nMT, svp)
-        logTTcj = np.log(cTTj / T0) - gamma
-        jcbpos[imp, :] = (logTTcj - logTTc) / deltap
-        imp += 1
+		cTTj, cTOj = calc_traveltime(tmpj, mpj, nMT, icfg, svp)
+		logTTcj = np.log( cTTj/T0 ) - gamma
+		jcbpos[imp,:] = (logTTcj - logTTc) / deltap
+		imp += 1
 
-    return jcbpos
+	return jcbpos

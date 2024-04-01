@@ -1,0 +1,78 @@
+import pandas as pd
+import configparser
+
+from mp_estimation_v2_2 import MPestimate_v2
+import schemas
+
+init_config = "/Users/franklyndunbar/Project/SeaFloorGeodesy/garpos/sample/Settings-fix.ini"
+kaiyo_config = "/Users/franklyndunbar/Project/SeaFloorGeodesy/garpos/sample/initcfg/SAGA/SAGA.1903.kaiyo_k4-initcfg.ini"
+kaiyo_obs_data = pd.read_csv("/Users/franklyndunbar/Project/SeaFloorGeodesy/garpos/sample/obsdata/SAGA/SAGA.1903.kaiyo_k4-obs.csv")
+kaiyo_svp_data = pd.read_csv("/Users/franklyndunbar/Project/SeaFloorGeodesy/garpos/sample/obsdata/SAGA/SAGA.1903.kaiyo_k4-svp.csv")
+
+site_config = configparser.ConfigParser()
+site_config.read(kaiyo_config)
+atd_offset = [x for x in site_config.get("Model-parameter","ATDoffset").split(" ") if x != '']
+atd_offset = schemas.ATDOffset(
+    forward=schemas.Point(value=float(atd_offset[0]),sigma=float(atd_offset[3])),
+    rightward=schemas.Point(value=float(atd_offset[1]),sigma=float(atd_offset[4])),
+    downward=schemas.Point(value=float(atd_offset[2]),sigma=float(atd_offset[5]))
+    )
+delta_center_position = [x for x in site_config.get("Model-parameter","dCentPos").split(" ") if x != '']
+delta_center_position = schemas.PositionENU(
+    east=schemas.Point(value=float(delta_center_position[0]),sigma=float(delta_center_position[3])),
+    north=schemas.Point(value=float(delta_center_position[1]),sigma=float(delta_center_position[4])),
+    up=schemas.Point(value=float(delta_center_position[2]),sigma=float(delta_center_position[5]))
+    )
+transponders = []
+transponder_id_list = [x for x in site_config.get("Site-parameter","Stations").split(" ") if x != '']
+for transponder_id in transponder_id_list:
+    position_list = [x for x in site_config.get("Model-parameter",transponder_id + "_dPos").split(" ") if x != '']
+    position = schemas.PositionENU(
+        east=schemas.Point(value=float(position_list[0]),sigma=float(position_list[3])),
+        north=schemas.Point(value=float(position_list[1]),sigma=float(position_list[4])),
+        up=schemas.Point(value=float(position_list[2]),sigma=float(position_list[5]))
+        )
+    transponder = schemas.Transponder(id=transponder_id,position_enu=position)
+    transponders.append(transponder)
+site_name = site_config.get("Obs-parameter","Site_name")
+params_config = configparser.ConfigParser()
+params_config.read(init_config)
+lamb0 = [x for x in params_config.get("HyperParameters","Log_Lambda0").split(" ") if x != ''][1]
+lgrad = [x for x in params_config.get("HyperParameters","Log_gradLambda").split(" ") if x != ''][0]
+mu_t = [x for x in params_config.get("HyperParameters","mu_t").split(" ") if x != ''][-1]
+mu_m = params_config.get("HyperParameters","mu_mt").split(" ")[-1]
+invtype = [x for x in params_config.get("Inv-parameter","inversiontype").split(" ") if x != ''][0]
+knot_ints = ["0","1","2"]
+knots = []
+for k in knot_ints:
+    knot = [x for x in params_config.get("Inv-parameter","knotint" + k).split(" ") if x != ''][0]
+    knots.append(float(knot))
+rsig = [x for x in params_config.get("Inv-parameter","RejectCriteria").split(" ")if x != ''][0]
+deltap = [x for x in params_config.get("Inv-parameter","deltap").split(" ") if x != ''][0]
+deltab = params_config.get("Inv-parameter","deltab").split(" ")[0]
+scale = params_config.get("Inv-parameter","traveltimescale").split(" ")[0]
+maxloop = params_config.get("Inv-parameter","maxloop").split(" ")[0]
+ConvCriteria = params_config.get("Inv-parameter","ConvCriteria").split(" ")[0]
+mp_args = {
+    "observation_data":kaiyo_obs_data,
+    "sound_speed_data":kaiyo_svp_data,
+    "atd_offset":atd_offset,
+    "transponders":transponders,
+    "delta_center_position":delta_center_position,
+    "stations":transponder_id_list,
+    "site_name":site_name,
+    "lamb0":float(lamb0)*-10,
+    "lgrad":float(lgrad)*-10,
+    "mu_t":float(mu_t),
+    "mu_m":float(mu_m),
+    "invtype":schemas.InversionType(int(invtype)),
+    "knots":knots,
+    "rsig":float(rsig),
+    "deltap":float(deltap),
+    "deltab":float(deltab),
+    "scale":float(scale),
+    "maxloop":int(maxloop),
+    "ConvCriteria":float(ConvCriteria),
+    "spdeg":3
+}
+site_data_res,abic_res,loop_res = MPestimate_v2(**mp_args)

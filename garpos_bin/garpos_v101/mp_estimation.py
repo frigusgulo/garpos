@@ -22,7 +22,7 @@ import pdb
 from typing import List
 # garpos module
 from .setup_model import init_position, make_knots, derivative2, data_correlation
-from ...src_2.forward_v2_2 import calc_forward, calc_gamma, jacobian_pos
+from .forward import calc_forward, calc_gamma, jacobian_pos
 from .output import outresults
 
 
@@ -304,7 +304,7 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
     nmp = len(mp0)
 
     ### Set a priori covariance for model parameters ###
-    
+    print(nmp)
     Di = lil_matrix( (nmp, nmp) )
     Di[:nmppos,:nmppos] = Dipos
     Di[nmppos:,nmppos:] = H

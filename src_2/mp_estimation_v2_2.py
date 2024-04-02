@@ -15,7 +15,7 @@ from sksparse.cholmod import cholesky
 import pandas as pd
 from typing import List, Tuple, Dict, Optional
 import logging
-
+from datetime import datetime
 # garpos module
 from schemas.hyp_params import InversionParams, InversionType
 from schemas.obs_data import (
@@ -53,6 +53,10 @@ def MPestimate_v2(
     delta_center_position: PositionENU,
     stations: List[str],
     site_name: str,
+    campaign:str,
+    date_utc:datetime,
+    date_jday:float,
+    ref_frame:str,
     lamb0: float,
     lgrad: float,
     mu_t: float,
@@ -92,7 +96,7 @@ def MPestimate_v2(
     knotint2 = knots[2]
 
     if knotint0 + knotint1 + knotint2 <= 1.0e-4:
-        invtyp = InversionType.positions
+        invtype = InversionType.positions
 
     shots = observation_data
     site = site_name
@@ -116,7 +120,7 @@ def MPestimate_v2(
     station_array_dcnt: List[float] = (
         delta_center_position.get_position() + delta_center_position.get_std_dev()
     )
-
+    # mp, Dipos, slvidx0, mtidx
     mppos, Dipos, slvidx0, mtidx = init_position(
         station_dpos=station_dpos,
         array_dcnt=station_array_dcnt,
@@ -258,7 +262,7 @@ def MPestimate_v2(
             jcb = lil_matrix((nmp, ndata))
 
         # Calc Jacobian for gamma
-        if invtyp != 0 and (rsig > 0.1 or iloop == 0):
+        if invtype.value != 0 and (rsig > 0.1 or iloop == 0):
             mpj = np.zeros(imp0[5])
             imp = nmppos
 
@@ -271,8 +275,9 @@ def MPestimate_v2(
                 mpj[impsv] = 0.0
 
         # Calc Jacobian for position
-        if invtyp != 1:
+        if invtype.value != 1:
             jcb0 = jacobian_pos(
+                slvidx0=slvidx0,
                 shotdat=tmp,
                 ray_tracer=ray_tracer,
                 deltab=deltab,
@@ -305,9 +310,9 @@ def MPestimate_v2(
         dmp = alpha * Ckrk
 
         dxmax = max(abs(dmp[:]))
-        if invtyp == 1 and rsig <= 0.1:
+        if invtype.value == 1 and rsig <= 0.1:
             dposmax = 0.0  # no loop needed in invtyp = 1
-        elif invtyp == 1 and rsig > 0.1:
+        elif invtype.value == 1 and rsig > 0.1:
             dposmax = ConvCriteria / 200.0
         else:
             dposmax = max(abs(dmp[:nmppos]))
@@ -323,7 +328,7 @@ def MPestimate_v2(
         ####################
         ### CALC Forward ###
         ####################
-        if invtyp != 0:
+        if invtype.value != 0:
             gamma, a = calc_gamma(mp, shots, imp0, spdeg, knots)
             shots["gamma"] = gamma * scale
             av = np.array(a) * scale * V0
@@ -443,10 +448,10 @@ def MPestimate_v2(
 
     site_data_results = output_results(
         site_name=site_name,
-        campaign="",
-        date_utc="",
-        date_jday="",
-        ref_frame="",
+        campaign=campaign,
+        date_utc=date_utc,
+        date_jday=date_jday,
+        ref_frame=ref_frame,
         latitude=0.0,
         longitude=0.0,
         height=0.0,
@@ -461,5 +466,3 @@ def MPestimate_v2(
     )
 
     return (site_data_results, abic_results, loop_results)
-
-

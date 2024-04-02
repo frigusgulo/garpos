@@ -277,6 +277,9 @@ def MPestimate(cfgf, icfgf, odir, suf, lamb0, lgrad, mu_t, mu_m, denu):
     slvidx = np.append(slvidx0, np.arange(imp0[0],imp0[-1],dtype=int))
     slvidx = slvidx.astype(int)
     """
+    >> mp.shape
+    (403,)
+    
 	>> ncps
 	[77, 77, 77, 77, 77]
 

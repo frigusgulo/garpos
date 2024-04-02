@@ -1,6 +1,7 @@
 import pandas as pd
 import configparser
-
+from datetime import datetime
+from julian import julian
 from mp_estimation_v2_2 import MPestimate_v2
 import schemas
 
@@ -35,6 +36,11 @@ for transponder_id in transponder_id_list:
     transponder = schemas.Transponder(id=transponder_id,position_enu=position)
     transponders.append(transponder)
 site_name = site_config.get("Obs-parameter","Site_name")
+date_utc = site_config.get("Obs-parameter","Date(UTC)")
+date_utc = datetime.strptime(date_utc, "%Y-%m-%d")
+date_mjd = julian.to_jd(date_utc)
+campaign = site_config.get("Obs-parameter","Campaign")
+ref_frame = site_config.get("Obs-parameter","Ref.Frame")
 params_config = configparser.ConfigParser()
 params_config.read(init_config)
 lamb0 = [x for x in params_config.get("HyperParameters","Log_Lambda0").split(" ") if x != ''][1]
@@ -54,6 +60,10 @@ scale = params_config.get("Inv-parameter","traveltimescale").split(" ")[0]
 maxloop = params_config.get("Inv-parameter","maxloop").split(" ")[0]
 ConvCriteria = params_config.get("Inv-parameter","ConvCriteria").split(" ")[0]
 mp_args = {
+    "date_utc":date_utc,
+    "campaign":campaign,
+    "date_jday":date_mjd,
+    "ref_frame":ref_frame,
     "observation_data":kaiyo_obs_data,
     "sound_speed_data":kaiyo_svp_data,
     "atd_offset":atd_offset,
@@ -61,12 +71,12 @@ mp_args = {
     "delta_center_position":delta_center_position,
     "stations":transponder_id_list,
     "site_name":site_name,
-    "lamb0":float(lamb0)*-10,
-    "lgrad":float(lgrad)*-10,
-    "mu_t":float(mu_t),
+    "lamb0":float(lamb0)/-100,
+    "lgrad":float(lgrad)/-10,
+    "mu_t":float(mu_t)*60,
     "mu_m":float(mu_m),
     "invtype":schemas.InversionType(int(invtype)),
-    "knots":knots,
+    "knots":[x*60 for x in knots],
     "rsig":float(rsig),
     "deltap":float(deltap),
     "deltab":float(deltab),

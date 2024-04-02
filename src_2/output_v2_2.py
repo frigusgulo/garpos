@@ -99,8 +99,8 @@ class Site(BaseModel):
 def output_results(
         site_name:str, 
         campaign:str, 
-        date_utc:str, 
-        date_jday:str, 
+        date_utc:datetime, 
+        date_jday:float, 
         ref_frame:str, 
         latitude:float, 
         longitude:float, 

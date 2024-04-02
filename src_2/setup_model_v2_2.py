@@ -142,7 +142,7 @@ def init_position(
 
 
 def make_knots(shotdat, spdeg, knotintervals):
-	"""
+    """
 	Create the B-spline knots for correction value "gamma".
 
 	Parameters
@@ -159,41 +159,47 @@ def make_knots(shotdat, spdeg, knotintervals):
 	knots : list of ndarray (len=5)
 		B-spline knots for each component in "gamma".
 	"""
+    """
+      >>spdeg
+      3
+      >>knotintervals
+      [5.0, 5.0, 5.0, 5.0, 5.0]
+	"""
 
-	sets = shotdat['SET'].unique()
-	st0s = np.array([shotdat.loc[shotdat.SET==s, "ST"].min() for s in sets])
-	stfs = np.array([shotdat.loc[shotdat.SET==s, "RT"].max() for s in sets])
+    sets = shotdat['SET'].unique()
+    st0s = np.array([shotdat.loc[shotdat.SET==s, "ST"].min() for s in sets])
+    stfs = np.array([shotdat.loc[shotdat.SET==s, "RT"].max() for s in sets])
 
-	st0 = shotdat.ST.values.min()
-	stf = shotdat.RT.values.max()
-	obsdur = stf - st0
+    st0 = shotdat.ST.values.min()
+    stf = shotdat.RT.values.max()
+    obsdur = stf - st0
 
-	nknots = [ int(obsdur/knint) for knint in knotintervals ]
-	knots = [ np.linspace(st0, stf, nall+1) for nall in nknots ]
+    nknots = [ int(obsdur/knint) for knint in knotintervals ]
+    knots = [ np.linspace(st0, stf, nall+1) for nall in nknots ]
 
-	for k, cn in enumerate(knots):
+    for k, cn in enumerate(knots):
 
-		if nknots[k] == 0:
-			knots[k] = np.array([])
-			continue
+        if nknots[k] == 0:
+            knots[k] = np.array([])
+            continue
 
-		rmknot = np.array([])
-		for i in range(len(sets)-1):
-			isetkn = np.where( (knots[k]>stfs[i]) & (knots[k]<st0s[i+1]) )[0]
-			if len(isetkn) > 2*(spdeg+2):
-				rmknot = np.append(rmknot, isetkn[spdeg+1:-spdeg-1])
-		rmknot = rmknot.astype(int)
+        rmknot = np.array([])
+        for i in range(len(sets)-1):
+            isetkn = np.where( (knots[k]>stfs[i]) & (knots[k]<st0s[i+1]) )[0]
+            if len(isetkn) > 2*(spdeg+2):
+                rmknot = np.append(rmknot, isetkn[spdeg+1:-spdeg-1])
+        rmknot = rmknot.astype(int)
 
-		if len(rmknot) > 0:
-			knots[k] = np.delete(knots[k], rmknot)
+        if len(rmknot) > 0:
+            knots[k] = np.delete(knots[k], rmknot)
 
-		dkn = (stf-st0)/float(nknots[k])
-		addkn0 = np.array( [st0-dkn*(n+1) for n in reversed(range(spdeg))] )
-		addknf = np.array( [stf+dkn*(n+1) for n in range(spdeg)] )
-		knots[k] = np.append(addkn0, knots[k])
-		knots[k] = np.append(knots[k], addknf)
+        dkn = (stf-st0)/float(nknots[k])
+        addkn0 = np.array( [st0-dkn*(n+1) for n in reversed(range(spdeg))] )
+        addknf = np.array( [stf+dkn*(n+1) for n in range(spdeg)] )
+        knots[k] = np.append(addkn0, knots[k])
+        knots[k] = np.append(knots[k], addknf)
 
-	return knots
+    return knots
 
 
 def derivative2(imp0,p,knots, lambdas):

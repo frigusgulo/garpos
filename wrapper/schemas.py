@@ -329,6 +329,7 @@ class InversionResults(BaseModel):
     grad_lambda_squared: float
     mu_t: float # [s]
     mu_mt: float
+    delta_center_position: List[float]
     loop_data: List[InversionLoop]
 
     @classmethod
@@ -356,6 +357,9 @@ class InversionResults(BaseModel):
                             max_dx=max_dx, 
                             hgt=hgt, 
                             inv_type=inv_type))
+                if line.startswith("dcentpos"):
+                    parsed_line = line.split()
+                    delta_center_position = [float(x) for x in parsed_line[2]]
                 if line.startswith("#  ABIC"):
                     parsed_line = line.split()
                     ABIC = float(parsed_line[3])
@@ -373,6 +377,7 @@ class InversionResults(BaseModel):
                     parsed_line = line.split()
                     mu_mt = float(parsed_line[3])
             return cls(
+                delta_center_position=delta_center_position,
                 ABIC=ABIC, 
                 misfit=misfit, 
                 inv_type=inv_type, 

@@ -4,7 +4,7 @@ sys.path.append("/Users/franklyndunbar/Project/SeaFloorGeodesy/garpos/")
 
 from typing import Tuple
 from garpos_bin.garpos_v101.garpos_main import drive_garpos
-from schemas import Observation,ObservationData,ModelResults,Site,ATDOffset,GarposFixed,GarposInput,InversionResults
+from wrapper.garpos_schemas import Observation,ObservationData,ModelResults,Site,ATDOffset,GarposFixed,GarposInput,InversionResults
 
 
 def main(input:GarposInput,fixed:GarposFixed) -> Tuple[GarposInput,GarposFixed,InversionResults]:

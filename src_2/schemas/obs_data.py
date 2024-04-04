@@ -122,9 +122,9 @@ class PositionENU(BaseModel):
         return cov_mat
 
 class PositionLLH(BaseModel):
-    latitude: Point
-    longitude: Point
-    height: Point
+    latitude: float
+    longitude: float
+    height: float
 
 class ATDOffset(BaseModel):
     forward: Point
@@ -151,29 +151,30 @@ class Transponder(BaseModel):
     position_enu: PositionENU
     #position_array_enu: PositionENU
 
-class SiteData(BaseModel):
-    center_enu: PositionENU
-    center_llh: PositionLLH
-    transponders: List[Transponder]
-
-class ModelParameters(BaseModel):
-    delta_center_position: PositionENU
-    atd_offset: ATDOffset
-    transponder_delta_position: Optional[List[PositionENU]] = None
-
-class Site(BaseModel):
-    name: str
-    campaign: Optional[str] = None
+class Observation(BaseModel):
+    campaign: str
     date_utc: datetime
     date_mjd: float
     ref_frame: str = "ITRF2014"
-    site_data: SiteData
-    atd_offset: ATDOffset
-    delta_center_position: PositionENU
-
     shot_data: DataFrame[ObservationData]
     sound_speed_data: DataFrame[SoundVelocityProfile]
 
+
+class Site(BaseModel):
+    name: str
+    atd_offset: ATDOffset
+    center_enu: PositionENU
+    center_llh: PositionLLH
+    transponders: List[Transponder]
+    delta_center_position: PositionENU
+
+
+class GarposInput(BaseModel):
+    observation: Observation
+    site: Site
+    shot_data_file: Optional[str] = None
+    sound_speed_file: Optional[str] = None
+    
 
 class ModelResults(ObservationData):
     # These fields are populated after the model run

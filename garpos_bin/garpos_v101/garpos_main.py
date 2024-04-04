@@ -65,10 +65,9 @@ def parallelrun(inplist, maxcore):
 	inp = list(zip(i0,i1,o1,o2,h0,h1,h2,h3,p0))
 	
 
-	reslist = MPestimate(*inp[0])
-	# with Pool(processes=mc) as p:
-	# 	reslist = p.starmap(MPestimate, inp)
-	# 	p.close()
+	with Pool(processes=mc) as p:
+		reslist = p.starmap(MPestimate, inp)
+		p.close()
 	
 	inplist["resfile"] = [ r[0] for r in reslist ]
 	inplist["RMS_dTT"] = [ r[1]/1000. for r in reslist ]

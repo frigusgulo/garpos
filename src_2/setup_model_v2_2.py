@@ -87,7 +87,7 @@ def init_position(
 
     dcnt = list(map(float, array_dcnt))
     # what is denu?
-    mp = np.append(mp, dcnt[0:3]+denu[0:3])
+    mp = np.append(mp, atd_offset.get_offset())
     ae = np.append(ae, dcnt[3:6])
     if len(dcnt) <= 6:
         covNU = 0.0

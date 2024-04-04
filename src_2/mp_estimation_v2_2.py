@@ -158,7 +158,24 @@ def MPestimate_v2(
     # set full model parameter vector
     mp = np.zeros(imp0[-1])
     mp[: imp0[0]] = mppos
+    """
+    >>> imp0
+    array([ 21,  98, 175, 252, 329, 406])
 
+    >>> ncps
+    [77, 77, 77, 77, 77]
+
+    >>> mppos
+    array([-4.700500e+01,  4.086450e+02, -1.345044e+03,  4.866430e+02,
+        4.812800e+01, -1.354312e+03, -2.635800e+01, -5.061430e+02,
+       -1.335817e+03, -5.381190e+02, -2.274800e+01, -1.330488e+03,
+        0.000000e+00,  0.000000e+00,  0.000000e+00,  0.000000e+00,
+        0.000000e+00,  0.000000e+00,  1.554700e+00, -1.269000e+00,
+        2.372950e+01])
+
+    >>> len(mppos)
+    21
+    """
     slvidx = np.append(slvidx0, np.arange(imp0[0], imp0[-1], dtype=int))
     slvidx = slvidx.astype(int)
 
